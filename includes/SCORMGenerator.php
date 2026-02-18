@@ -276,7 +276,7 @@ class SCORMGenerator
                             ];
                         }
                     } else {
-                        $imgHtml = $this->renderSectionImage($sec);
+                        $imgHtml = $this->renderSectionImage($sec, $si);
                         $steps[] = [
                             'id' => $secId,
                             'label' => $udN . '.' . $sn . '. ' . $sec['titulo'],
@@ -349,7 +349,14 @@ class SCORMGenerator
             $sh = $items; shuffle($sh);
             foreach ($sh as $c) {
                 $oi = array_search($c, $items);
-                $mh .= '<div class="matching-def" draggable="true" data-match="m' . $oi . '">' . $this->e(mb_substr($c['definicion'], 0, 120)) . '</div>';
+                $defText = $c['definicion'];
+                if (mb_strlen($defText) > 120) {
+                    $defText = mb_substr($defText, 0, 120);
+                    $lastSpace = mb_strrpos($defText, ' ');
+                    if ($lastSpace > 80) $defText = mb_substr($defText, 0, $lastSpace);
+                    $defText .= '...';
+                }
+                $mh .= '<div class="matching-def" draggable="true" data-match="m' . $oi . '">' . $this->e($defText) . '</div>';
             }
             $mh .= '</div></div><button class="btn-action" onclick="comprobarMatching(this)">Comprobar</button><div class="matching-resultado"></div>';
             $steps[] = [
@@ -376,7 +383,7 @@ class SCORMGenerator
                     'id' => 'step-auto' . $qn, 'label' => 'Autoevaluaci&oacute;n ' . $qn,
                     'epi' => true, 'hide' => ($qn > 1),
                     'html' => $this->wrapStep('step-auto' . $qn, true, true,
-                        '<hr class="line-accent"><h3 class="titleicon"><span class="icon-bullet">&#128172;</span> Autoevaluaci&oacute;n ' . $qn . '/' . $tq . '</h3>'
+                        '<hr class="line-accent"><h3 class="titleicon">' . self::svg('check', '#F05726', 24) . ' Autoevaluaci&oacute;n ' . $qn . '/' . $tq . '</h3>'
                         . '<div class="card-box"><p class="pregunta">' . $this->e($q['pregunta']) . '</p>' . $oh
                         . '<center><button class="btn-action mt-3" onclick="capturarQ(' . $qn . ',\'' . $eo . '\',\'' . $eb . '\')">Comprobar</button></center>'
                         . '<div id="resultado_q' . $qn . '"></div></div>')
@@ -396,7 +403,7 @@ class SCORMGenerator
         $steps[] = [
             'id' => 'step-conclusion', 'label' => 'Conclusiones', 'epi' => false, 'hide' => true,
             'html' => $this->wrapStep('step-conclusion', true, true,
-                '<h3 class="titleicon"><span class="icon-bullet">&#128221;</span> Conclusiones</h3>'
+                '<h3 class="titleicon">' . self::svg('clipboard', '#F05726', 24) . ' Conclusiones</h3>'
                 . '<div class="card-box intro">' . $conc . '</div>')
         ];
 
@@ -834,9 +841,15 @@ img{max-width:100%}.d-none{display:none!important}
 .sec-num{color:var(--accent);font-weight:700;margin-right:.3rem}
 .icon-bullet{font-size:1.3rem}.titleicon{display:flex;align-items:center;gap:.5rem}
 .sec-header-icon svg{flex-shrink:0}
-.sec-banner{margin:0 0 1.5rem;border-radius:var(--radius);overflow:hidden;position:relative;max-height:280px}
-.sec-banner img{width:100%;height:auto;max-height:280px;object-fit:cover;display:block}
-.sec-img-credit{position:absolute;bottom:8px;right:10px;font-size:.7rem;color:rgba(255,255,255,.8);background:rgba(0,0,0,.4);padding:2px 8px;border-radius:4px}
+.sec-banner{border-radius:var(--radius);overflow:hidden;position:relative;margin-bottom:1.5rem}
+.sec-banner img{display:block;object-fit:cover;width:100%}
+.sec-img-credit{position:absolute;bottom:8px;right:12px;font-size:.72rem;color:#fff;background:rgba(0,0,0,.5);padding:3px 10px;border-radius:4px;z-index:2}
+.layout-full{height:240px}.layout-full img{height:240px}
+.layout-card{margin:0 auto 1.5rem;max-width:580px;text-align:center;background:var(--card);padding:.5rem .5rem .2rem;box-shadow:var(--shadow);border-radius:var(--radius)}.layout-card img{height:220px;border-radius:8px}
+.sec-img-caption{display:block;font-size:.75rem;color:var(--text-light);margin-top:.4rem;padding-bottom:.3rem;font-style:italic}
+.layout-gradient{height:260px}.layout-gradient img{height:260px}
+.sec-gradient-overlay{position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,.35) 0%,transparent 50%)}
+@media(max-width:600px){.layout-full,.layout-gradient{height:180px}.layout-full img,.layout-gradient img{height:180px}.layout-card img{height:160px}}
 .idevice{animation:fadeSlideIn .4s ease-out}
 .accordion-item{animation:fadeSlideIn .3s ease-out}
 .accordion-item:nth-child(2){animation-delay:.05s}
@@ -1021,17 +1034,32 @@ CSSEND;
     }
 
     /**
-     * Renderiza imagen de cabecera de sección (Fase 4)
-     * Soporta imágenes del Word o de Unsplash
+     * Renderiza imagen de sección con 3 layouts alternados (Fase 4)
+     * Layout 0: banner full-width
+     * Layout 1: card centrada con caption
+     * Layout 2: banner con overlay gradient
      */
-    private function renderSectionImage(array $sec): string
+    private function renderSectionImage(array $sec, int $sectionIndex = 0): string
     {
         $img = $sec['image'] ?? '';
         if (empty($img)) return '';
         $credit = $sec['image_credit'] ?? '';
         $alt = $this->e($sec['titulo'] ?? 'Imagen de sección');
         $creditHtml = !empty($credit) ? '<span class="sec-img-credit">Foto: ' . $this->e($credit) . '</span>' : '';
-        return '<div class="sec-banner"><img src="../img/' . $this->e($img) . '" alt="' . $alt . '" loading="lazy">' . $creditHtml . '</div>';
+        $src = '../img/' . $this->e($img);
+        $layout = $sectionIndex % 3;
+
+        switch ($layout) {
+            case 0: // Banner full-width
+                return '<div class="sec-banner layout-full">' . $creditHtml . '<img src="' . $src . '" alt="' . $alt . '" loading="lazy"></div>';
+            case 1: // Card centrada con caption
+                $creditCaption = !empty($credit) ? '<figcaption class="sec-img-caption">Foto: ' . $this->e($credit) . '</figcaption>' : '';
+                return '<figure class="sec-banner layout-card"><img src="' . $src . '" alt="' . $alt . '" loading="lazy">' . $creditCaption . '</figure>';
+            case 2: // Banner con gradient overlay
+                return '<div class="sec-banner layout-gradient"><img src="' . $src . '" alt="' . $alt . '" loading="lazy"><div class="sec-gradient-overlay"></div>' . $creditHtml . '</div>';
+            default:
+                return '<div class="sec-banner layout-full">' . $creditHtml . '<img src="' . $src . '" alt="' . $alt . '" loading="lazy"></div>';
+        }
     }
 
     // =====================================================================
