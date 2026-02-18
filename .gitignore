@@ -1,0 +1,26 @@
+# Secrets
+.env
+
+# Temp & uploads
+temp/
+uploads/
+logs/
+
+# Dependencies
+vendor/
+node_modules/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Generated packages
+*.zip
