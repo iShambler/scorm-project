@@ -1,0 +1,33 @@
+{
+  "id": "arelance-corporate",
+  "name": "Arelance Corporativo",
+  "description": "Estilo corporativo profesional con azul marino y naranja. Portada con gradiente, menú lateral, acordeones con iconos SVG, flashcards interactivas, tablas estilizadas y diseño responsive.",
+  "author": "Arelance",
+  "version": "2.0",
+  "colors": {
+    "primary": "#143554",
+    "secondary": "#1a4a6e",
+    "accent": "#F05726",
+    "bg": "#f8f9fa",
+    "card": "#ffffff",
+    "text": "#333333",
+    "text_light": "#666666",
+    "border": "#e0e0e0",
+    "success": "#22c55e",
+    "danger": "#ef4444",
+    "warning": "#f59e0b"
+  },
+  "fonts": {
+    "heading": "Poppins",
+    "body": "Inter",
+    "code": "Fira Code"
+  },
+  "settings": {
+    "radius": "12px",
+    "portada_style": "gradient",
+    "sidebar_style": "gradient",
+    "google_fonts_url": "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap"
+  },
+  "logo": "",
+  "portada_bg": ""
+}

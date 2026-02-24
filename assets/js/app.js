@@ -1,82 +1,47 @@
 /**
- * JavaScript del Conversor Word a SCORM
- * ARELANCE S.L. - 2025
+ * SCORM Generator — App JS
+ * ARELANCE S.L. 2025
  */
 
-// =============================================
-// ESTADO GLOBAL
-// =============================================
 let currentStep = 1;
 let uploadedFile = null;
 let analysisData = null;
 let downloadData = null;
+let selectedTemplate = 'arelance-corporate';
+let templatesLoaded = false;
 
-// =============================================
-// INICIALIZACIÓN
-// =============================================
+// ── Init ──
 document.addEventListener('DOMContentLoaded', function() {
     initUpload();
     initButtons();
     checkAIStatus();
+    const importInput = document.getElementById('template-import-input');
+    if (importInput) {
+        importInput.addEventListener('change', importTemplate);
+    }
 });
 
-// =============================================
-// UPLOAD
-// =============================================
+// ── Upload ──
 function initUpload() {
-    const uploadZone = document.getElementById('upload-zone');
-    const fileInput = document.getElementById('file-input');
-    const btnRemove = document.getElementById('btn-remove-file');
-    
-    // Click en zona de upload
-    uploadZone.addEventListener('click', () => fileInput.click());
-    
-    // Drag & drop
-    uploadZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        uploadZone.classList.add('dragover');
+    const zone = document.getElementById('upload-zone');
+    const input = document.getElementById('file-input');
+    const remove = document.getElementById('btn-remove-file');
+
+    zone.addEventListener('click', () => input.click());
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', e => { e.preventDefault(); zone.classList.remove('dragover'); });
+    zone.addEventListener('drop', e => {
+        e.preventDefault(); zone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
     });
-    
-    uploadZone.addEventListener('dragleave', (e) => {
-        e.preventDefault();
-        uploadZone.classList.remove('dragover');
-    });
-    
-    uploadZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        uploadZone.classList.remove('dragover');
-        if (e.dataTransfer.files.length > 0) {
-            handleFile(e.dataTransfer.files[0]);
-        }
-    });
-    
-    // Input file change
-    fileInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) {
-            handleFile(e.target.files[0]);
-        }
-    });
-    
-    // Remove file
-    btnRemove.addEventListener('click', (e) => {
-        e.stopPropagation();
-        clearFile();
-    });
+    input.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+    remove.addEventListener('click', e => { e.stopPropagation(); clearFile(); });
 }
 
 function handleFile(file) {
-    if (!file.name.toLowerCase().endsWith('.docx')) {
-        alert('Por favor, selecciona un archivo .docx');
-        return;
-    }
-    
-    if (file.size > 50 * 1024 * 1024) {
-        alert('El archivo excede el tamaño máximo de 50MB');
-        return;
-    }
-    
+    if (!file.name.toLowerCase().endsWith('.docx')) { alert('Solo archivos .docx'); return; }
+    if (file.size > 50*1024*1024) { alert('Archivo demasiado grande (max 50MB)'); return; }
     uploadedFile = file;
-    
     document.getElementById('file-name').textContent = file.name;
     document.getElementById('file-size').textContent = formatSize(file.size);
     document.getElementById('file-preview').classList.remove('hidden');
@@ -92,400 +57,300 @@ function clearFile() {
 
 function formatSize(bytes) {
     if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' KB';
+    return (bytes/1048576).toFixed(1) + ' MB';
 }
 
-// =============================================
-// BOTONES
-// =============================================
+// ── Buttons ──
 function initButtons() {
     document.getElementById('btn-analyze').addEventListener('click', analyzeDocument);
     document.getElementById('btn-generate').addEventListener('click', generateSCORM);
     document.getElementById('btn-download').addEventListener('click', downloadSCORM);
 }
 
-// =============================================
-// VERIFICAR ESTADO IA
-// =============================================
+// ── AI Status ──
 function checkAIStatus() {
-    const statusBox = document.getElementById('ai-status');
-    
-    // Por ahora, mostrar que la IA está disponible si se configura
-    fetch('api/analyze.php', {
-        method: 'POST',
-        body: new FormData() // Empty request to check
-    })
-    .then(response => response.json())
-    .then(data => {
-        // Si devuelve error de archivo, la API funciona
-        statusBox.className = 'info-box success';
-        statusBox.innerHTML = `
-            <h4>🤖 IA habilitada</h4>
-            <p>Claude API está configurada. El análisis incluirá generación inteligente de contenido.</p>
-        `;
-    })
-    .catch(error => {
-        statusBox.className = 'info-box warning';
-        statusBox.innerHTML = `
-            <h4>⚠️ Modo básico</h4>
-            <p>La API de Claude no está configurada. Se usará análisis básico sin IA.</p>
-        `;
-    });
+    // Silent check, no UI feedback needed
+    fetch('api/analyze.php', { method: 'POST', body: new FormData() }).catch(() => {});
 }
 
-// =============================================
-// ANÁLISIS DEL DOCUMENTO
-// =============================================
+// ── Analyze ──
 async function analyzeDocument() {
     if (!uploadedFile) return;
-    
-    showLoading('Analizando documento...', 'La IA está procesando tu documento Word para extraer la estructura y generar contenido.');
-    
-    const formData = new FormData();
-    formData.append('document', uploadedFile);
-    
+    showLoading('Analizando documento...', 'Procesando estructura y generando contenido');
+    const fd = new FormData();
+    fd.append('document', uploadedFile);
     try {
         updateProgress(10);
-        
-        const response = await fetch('api/analyze.php', {
-            method: 'POST',
-            body: formData
-        });
-        
+        const resp = await fetch('api/analyze.php', { method: 'POST', body: fd });
         updateProgress(50);
-        
-        const result = await response.json();
-        
-        if (!result.success) {
-            throw new Error(result.message || 'Error al analizar el documento');
-        }
-        
+        const result = await resp.json();
+        if (!result.success) throw new Error(result.message || 'Error en el analisis');
         updateProgress(80);
-        
         analysisData = result.data;
-        
-        // Llenar formulario de configuración
         document.getElementById('cfg-code').value = analysisData.modulo.codigo || 'MOD_01';
         document.getElementById('cfg-title').value = analysisData.modulo.titulo || '';
         document.getElementById('cfg-hours').value = analysisData.modulo.duracion_total || 50;
-        
-        // Renderizar unidades
         renderUnitsList();
-        
-        // Mostrar estadísticas
         renderSummaryStats();
-        
         updateProgress(100);
-        
-        setTimeout(() => {
-            hideLoading();
-            goToStep(2);
-        }, 500);
-        
-    } catch (error) {
-        hideLoading();
-        alert('Error: ' + error.message);
-    }
+        setTimeout(() => { hideLoading(); goToStep(2); }, 500);
+    } catch (err) { hideLoading(); alert('Error: ' + err.message); }
 }
 
-// =============================================
-// RENDERIZADO
-// =============================================
+// ── Render ──
 function renderUnitsList() {
-    const container = document.getElementById('units-list');
-    let html = '';
-    
-    analysisData.unidades.forEach((unit, index) => {
-        const flashcards = unit.conceptos_clave?.length || 0;
-        const questions = unit.preguntas?.length || 0;
-        const sections = unit.secciones?.length || 0;
-        
-        html += `
-            <div class="unit-item">
-                <div class="unit-header">
-                    <div class="unit-num">UD${unit.numero}</div>
-                    <div class="unit-title">${escapeHtml(unit.titulo)}</div>
-                    <div class="unit-hours">${unit.duracion}h</div>
-                </div>
-                <div class="unit-stats">
-                    <span class="unit-stat">🎴 ${flashcards} flashcards</span>
-                    <span class="unit-stat">📑 ${sections} secciones</span>
-                    <span class="unit-stat">❓ ${questions} preguntas</span>
-                </div>
-            </div>
-        `;
+    const c = document.getElementById('units-list');
+    let h = '';
+    analysisData.unidades.forEach((u, i) => {
+        const fc = u.conceptos_clave?.length || 0;
+        const q = u.preguntas?.length || 0;
+        const s = u.secciones?.length || 0;
+        h += '<div class="unit-item">'
+            + '<div class="unit-num">UD' + u.numero + '</div>'
+            + '<div class="unit-title"><input type="text" class="unit-title-input" data-unit-idx="' + i + '" value="' + esc(u.titulo).replace(/"/g, '&quot;') + '" /></div>'
+            + '<div class="unit-stats"><span class="unit-stat">' + s + ' secc.</span><span class="unit-stat">' + fc + ' flash.</span><span class="unit-stat">' + q + ' preg.</span></div>'
+            + '<div class="unit-hours">' + u.duracion + 'h</div>'
+            + '</div>';
     });
-    
-    container.innerHTML = html;
+    c.innerHTML = h;
+    // Sync edits back to data
+    c.querySelectorAll('.unit-title-input').forEach(inp => {
+        inp.addEventListener('change', e => {
+            const idx = parseInt(e.target.dataset.unitIdx);
+            analysisData.unidades[idx].titulo = e.target.value;
+        });
+    });
 }
 
 function renderSummaryStats() {
-    let totalFlashcards = 0;
-    let totalQuestions = 0;
-    let totalSections = 0;
-    let totalHours = 0;
-    
-    analysisData.unidades.forEach(unit => {
-        totalFlashcards += unit.conceptos_clave?.length || 0;
-        totalQuestions += unit.preguntas?.length || 0;
-        totalSections += unit.secciones?.length || 0;
-        totalHours += unit.duracion || 0;
+    let fc=0, q=0, s=0, hrs=0;
+    analysisData.unidades.forEach(u => {
+        fc += u.conceptos_clave?.length || 0;
+        q += u.preguntas?.length || 0;
+        s += u.secciones?.length || 0;
+        hrs += u.duracion || 0;
     });
-    
-    const html = `
-        <div class="summary-item">
-            <div class="icon">📚</div>
-            <div class="value">${analysisData.unidades.length}</div>
-            <div class="label">Unidades</div>
-        </div>
-        <div class="summary-item">
-            <div class="icon">⏱️</div>
-            <div class="value">${totalHours}h</div>
-            <div class="label">Duración</div>
-        </div>
-        <div class="summary-item">
-            <div class="icon">🎴</div>
-            <div class="value">${totalFlashcards}</div>
-            <div class="label">Flashcards</div>
-        </div>
-        <div class="summary-item">
-            <div class="icon">❓</div>
-            <div class="value">${totalQuestions}</div>
-            <div class="label">Preguntas</div>
-        </div>
-    `;
-    
-    document.getElementById('summary-stats').innerHTML = html;
+    document.getElementById('summary-stats').innerHTML =
+        stat(analysisData.unidades.length, 'Unidades') +
+        stat(hrs + 'h', 'Duracion') +
+        stat(fc, 'Flashcards') +
+        stat(q, 'Preguntas');
+}
+
+function stat(val, label) {
+    return '<div class="summary-item"><div class="value">' + val + '</div><div class="label">' + label + '</div></div>';
 }
 
 function renderUnitTabs() {
-    const header = document.getElementById('tabs-header');
-    const content = document.getElementById('tabs-content');
-    
-    let headerHtml = '';
-    let contentHtml = '';
-    
-    analysisData.unidades.forEach((unit, index) => {
-        headerHtml += `
-            <button class="tab-btn ${index === 0 ? 'active' : ''}" onclick="switchTab(${index})">
-                UD${unit.numero}
-            </button>
-        `;
+    const hdr = document.getElementById('tabs-header');
+    const cnt = document.getElementById('tabs-content');
+    let hh = '', ch = '';
+    analysisData.unidades.forEach((u, i) => {
+        const act = i === 0 ? ' active' : '';
+        hh += '<button class="tab-btn' + act + '" onclick="switchTab(' + i + ')">UD' + u.numero + '</button>';
         
-        contentHtml += `
-            <div class="tab-panel ${index === 0 ? 'active' : ''}" id="tab-panel-${index}">
-                <div class="panel-section">
-                    <h4>📌 Objetivos</h4>
-                    <ul>
-                        ${(unit.objetivos || []).map(obj => `<li>${escapeHtml(obj)}</li>`).join('')}
-                    </ul>
-                </div>
-                
-                <div class="panel-section">
-                    <h4>🎴 Flashcards (${unit.conceptos_clave?.length || 0})</h4>
-                    <div class="flashcard-grid">
-                        ${(unit.conceptos_clave || []).map(fc => `
-                            <div class="flashcard-item">
-                                <strong>${escapeHtml(fc.termino)}</strong>
-                                <span>${escapeHtml(fc.definicion)}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-                
-                <div class="panel-section">
-                    <h4>❓ Preguntas de autoevaluación (${unit.preguntas?.length || 0})</h4>
-                    ${(unit.preguntas || []).map((q, qi) => `
-                        <div class="question-item">
-                            <strong>${qi + 1}. ${escapeHtml(q.pregunta)}</strong>
-                            <ul>
-                                ${(q.opciones || []).map((opt, oi) => `
-                                    <li class="${oi === q.correcta ? 'correct' : ''}">${escapeHtml(opt)}</li>
-                                `).join('')}
-                            </ul>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
+        // Build structured content preview
+        let sectionsHtml = '';
+        (u.secciones || []).forEach((sec, si) => {
+            sectionsHtml += '<div class="preview-section">';
+            sectionsHtml += '<h4 class="preview-section-title">' + (si+1) + '. ' + esc(sec.titulo) + '</h4>';
+            
+            // Render contenido_estructurado blocks
+            const blocks = sec.contenido_estructurado || sec.bloques || [];
+            if (blocks.length > 0) {
+                blocks.forEach(b => {
+                    sectionsHtml += renderBlockPreview(b);
+                });
+            } else if (sec.contenido) {
+                // Fallback: plain text content
+                sectionsHtml += '<div class="preview-block preview-parrafo">' + esc(sec.contenido).substring(0, 500) + (sec.contenido.length > 500 ? '...' : '') + '</div>';
+            }
+            sectionsHtml += '</div>';
+        });
+        
+        ch += '<div class="tab-panel' + act + '" id="tab-panel-' + i + '">'
+            + '<div class="panel-section"><h4>Resumen</h4><p>' + esc(u.resumen || '') + '</p></div>'
+            + '<div class="panel-section"><h4>Objetivos</h4><ul>' + (u.objetivos || []).map(o => '<li>' + esc(o) + '</li>').join('') + '</ul></div>'
+            + '<div class="panel-section"><h4>Estructura del contenido (' + (u.secciones?.length||0) + ' secciones)</h4>' + sectionsHtml + '</div>'
+            + '<div class="panel-section"><h4>Conceptos clave (' + (u.conceptos_clave?.length||0) + ')</h4><div class="flashcard-grid">'
+            + (u.conceptos_clave || []).map(f => '<div class="flashcard-item"><strong>' + esc(f.termino) + '</strong><span>' + esc(f.definicion) + '</span></div>').join('') + '</div></div>'
+            + '<div class="panel-section"><h4>Preguntas (' + (u.preguntas?.length||0) + ')</h4>'
+            + (u.preguntas || []).map((p,qi) => '<div class="question-item"><strong>' + (qi+1) + '. ' + esc(p.pregunta) + '</strong><ul>'
+                + (p.opciones||[]).map((o,oi) => '<li class="' + (oi===p.correcta?'correct':'') + '">' + esc(o) + '</li>').join('') + '</ul></div>').join('') + '</div></div>';
     });
-    
-    header.innerHTML = headerHtml;
-    content.innerHTML = contentHtml;
+    hdr.innerHTML = hh;
+    cnt.innerHTML = ch;
 }
 
-function switchTab(index) {
-    document.querySelectorAll('.tab-btn').forEach((btn, i) => {
-        btn.classList.toggle('active', i === index);
-    });
-    document.querySelectorAll('.tab-panel').forEach((panel, i) => {
-        panel.classList.toggle('active', i === index);
-    });
+function renderBlockPreview(b) {
+    const tipo = b.tipo || 'parrafo';
+    const text = b.texto || b.contenido || '';
+    switch(tipo) {
+        case 'parrafo':
+            return '<div class="preview-block preview-parrafo">' + esc(text) + '</div>';
+        case 'definicion':
+            return '<div class="preview-block preview-definicion"><strong>' + esc(b.termino || '') + ':</strong> ' + esc(text) + '</div>';
+        case 'lista':
+            const tit = b.titulo ? '<p class="preview-list-title">' + esc(b.titulo) + '</p>' : '';
+            return '<div class="preview-block preview-lista">' + tit + '<ul>' + (b.items||[]).map(it => '<li>' + esc(it) + '</li>').join('') + '</ul></div>';
+        case 'tabla':
+            if (!b.filas || !b.filas.length) return '';
+            let th = '<tr>' + b.filas[0].map(c => '<th>' + esc(c) + '</th>').join('') + '</tr>';
+            let tb = b.filas.slice(1).map(r => '<tr>' + r.map(c => '<td>' + esc(c) + '</td>').join('') + '</tr>').join('');
+            return '<div class="preview-block preview-tabla"><table>' + th + tb + '</table></div>';
+        case 'importante':
+            return '<div class="preview-block preview-importante"><strong>Importante:</strong> ' + esc(text) + '</div>';
+        case 'sabias_que':
+            return '<div class="preview-block preview-sabias"><strong>Sab\u00edas que:</strong> ' + esc(text) + '</div>';
+        case 'ejemplo':
+            return '<div class="preview-block preview-ejemplo"><strong>Ejemplo:</strong> ' + esc(text) + '</div>';
+        case 'comparativa':
+            return '<div class="preview-block preview-comparativa"><strong>Comparativa:</strong><ul>' + (b.items||[]).map(it => '<li>' + esc(it) + '</li>').join('') + '</ul></div>';
+        default:
+            return '<div class="preview-block preview-parrafo">' + esc(text) + '</div>';
+    }
 }
 
-// =============================================
-// GENERACIÓN SCORM
-// =============================================
+function switchTab(idx) {
+    document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', i===idx));
+    document.querySelectorAll('.tab-panel').forEach((p,i) => p.classList.toggle('active', i===idx));
+}
+
+// ── Generate ──
 async function generateSCORM() {
-    showLoading('Generando SCORM...', 'Creando el paquete con todos los archivos HTML, CSS, JavaScript y el manifest.');
-    
-    // Actualizar configuración desde el formulario
+    showLoading('Generando SCORM...', 'Creando paquete con HTML, CSS, JS y manifest');
     analysisData.modulo.codigo = document.getElementById('cfg-code').value;
     analysisData.modulo.titulo = document.getElementById('cfg-title').value;
     analysisData.modulo.duracion_total = parseInt(document.getElementById('cfg-hours').value) || 50;
     analysisData.modulo.empresa = document.getElementById('cfg-company').value;
-    
+    analysisData.template_id = selectedTemplate || 'arelance-corporate';
     try {
         updateProgress(20);
-        
-        const response = await fetch('api/generate.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(analysisData)
-        });
-        
+        const resp = await fetch('api/generate.php', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(analysisData) });
         updateProgress(70);
-        
-        const result = await response.json();
-        
-        if (!result.success) {
-            throw new Error(result.message || 'Error al generar el SCORM');
-        }
-        
+        const result = await resp.json();
+        if (!result.success) throw new Error(result.message || 'Error en la generacion');
         downloadData = result.data;
-        
         updateProgress(100);
-        
-        // Renderizar estadísticas finales
         renderFinalStats();
-        
-        setTimeout(() => {
-            hideLoading();
-            goToStep(4);
-        }, 500);
-        
-    } catch (error) {
-        hideLoading();
-        alert('Error: ' + error.message);
-    }
+        setTimeout(() => { hideLoading(); goToStep(4); }, 500);
+    } catch (err) { hideLoading(); alert('Error: ' + err.message); }
 }
 
 function renderFinalStats() {
-    const stats = downloadData.stats;
-    
-    const html = `
-        <div class="summary-item">
-            <div class="icon">📄</div>
-            <div class="value">${stats.units}</div>
-            <div class="label">HTML generados</div>
-        </div>
-        <div class="summary-item">
-            <div class="icon">🎴</div>
-            <div class="value">${stats.flashcards}</div>
-            <div class="label">Flashcards</div>
-        </div>
-        <div class="summary-item">
-            <div class="icon">❓</div>
-            <div class="value">${stats.questions}</div>
-            <div class="label">Preguntas</div>
-        </div>
-        <div class="summary-item">
-            <div class="icon">📦</div>
-            <div class="value">${formatSize(downloadData.size)}</div>
-            <div class="label">Tamaño</div>
-        </div>
-    `;
-    
-    document.getElementById('final-stats').innerHTML = html;
+    const s = downloadData.stats;
+    document.getElementById('final-stats').innerHTML =
+        stat(s.units, 'Unidades') + stat(s.flashcards, 'Flashcards') +
+        stat(s.questions, 'Preguntas') + stat(formatSize(downloadData.size), 'Tamano');
 }
 
-// =============================================
-// DESCARGA
-// =============================================
+// ── Download ──
 function downloadSCORM() {
     if (!downloadData) return;
-    
-    window.location.href = `api/download.php?id=${downloadData.download_id}&filename=${encodeURIComponent(downloadData.filename)}`;
+    window.location.href = 'api/download.php?id=' + downloadData.download_id + '&filename=' + encodeURIComponent(downloadData.filename);
 }
 
-// =============================================
-// NAVEGACIÓN
-// =============================================
+// ── Navigation ──
 function goToStep(step) {
-    // Ocultar todos los pasos
-    document.querySelectorAll('.step-content').forEach(el => {
-        el.classList.add('hidden');
-    });
-    
-    // Mostrar paso actual
-    document.getElementById(`step-${step}`).classList.remove('hidden');
-    
-    // Actualizar indicadores
+    document.querySelectorAll('.step-content').forEach(e => e.classList.add('hidden'));
+    document.getElementById('step-' + step).classList.remove('hidden');
     document.querySelectorAll('.step').forEach((el, i) => {
-        const stepNum = i + 1;
-        el.classList.remove('active', 'completed');
-        
-        if (stepNum < step) {
-            el.classList.add('completed');
-            el.querySelector('.step-circle').textContent = '✓';
-        } else if (stepNum === step) {
-            el.classList.add('active');
-            el.querySelector('.step-circle').textContent = stepNum;
-        } else {
-            el.querySelector('.step-circle').textContent = stepNum;
-        }
+        const n = i + 1;
+        el.classList.remove('active','completed');
+        if (n < step) { el.classList.add('completed'); el.querySelector('.step-circle').textContent = '\u2713'; }
+        else if (n === step) { el.classList.add('active'); el.querySelector('.step-circle').textContent = n; }
+        else { el.querySelector('.step-circle').textContent = n; }
     });
-    
-    // Actualizar líneas
-    document.querySelectorAll('.step-line').forEach((line, i) => {
-        line.classList.toggle('completed', i < step - 1);
-    });
-    
+    document.querySelectorAll('.step-line').forEach((l,i) => l.classList.toggle('completed', i < step-1));
     currentStep = step;
-    
-    // Renderizar contenido específico del paso
-    if (step === 3) {
-        renderUnitTabs();
-    }
+    if (step === 2 && !templatesLoaded) loadTemplates();
+    if (step === 3) renderUnitTabs();
 }
 
 function resetApp() {
-    currentStep = 1;
-    uploadedFile = null;
-    analysisData = null;
-    downloadData = null;
-    
-    clearFile();
-    goToStep(1);
+    currentStep=1; uploadedFile=null; analysisData=null; downloadData=null;
+    clearFile(); goToStep(1);
 }
 
-// =============================================
-// LOADING
-// =============================================
-function showLoading(title, message) {
-    document.getElementById('loading-title').textContent = title;
-    document.getElementById('loading-message').textContent = message;
+// ── Loading ──
+function showLoading(t, m) {
+    document.getElementById('loading-title').textContent = t;
+    document.getElementById('loading-message').textContent = m;
     document.getElementById('loading-progress').style.width = '0%';
     document.getElementById('loading-overlay').classList.remove('hidden');
 }
+function hideLoading() { document.getElementById('loading-overlay').classList.add('hidden'); }
+function updateProgress(p) { document.getElementById('loading-progress').style.width = p + '%'; }
 
-function hideLoading() {
-    document.getElementById('loading-overlay').classList.add('hidden');
+// ── Utils ──
+function esc(t) { if (!t) return ''; const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+// Keep old name for compatibility
+var escapeHtml = esc;
+
+// ── Templates ──
+async function loadTemplates() {
+    const grid = document.getElementById('templates-grid');
+    if (!grid) return;
+    try {
+        const resp = await fetch('api/templates.php');
+        const text = await resp.text();
+        console.log('Templates API raw:', text);
+        let json;
+        try { json = JSON.parse(text); } catch(e) { throw new Error('API no devuelve JSON: ' + text.substring(0, 200)); }
+        if (!json.success) throw new Error(json.message);
+        const templates = json.data.templates;
+        selectedTemplate = json.data.default;
+        grid.innerHTML = '';
+        templates.forEach(tpl => {
+            const colors = tpl.colors || {};
+            const isDefault = tpl.id === json.data.default;
+            const card = document.createElement('div');
+            card.className = 'template-card' + (tpl.id === selectedTemplate ? ' selected' : '') + (isDefault ? ' is-default' : '');
+            card.dataset.templateId = tpl.id;
+            const pri = colors.primary || '#143554', sec = colors.secondary || '#1a4a6e', acc = colors.accent || '#F05726';
+            let prev = tpl.preview_exists
+                ? '<img src="api/templates.php?preview=' + tpl.id + '" alt="' + esc(tpl.name) + '">'
+                : '<div style="color:#fff;font-size:.8rem;font-weight:600;text-align:center;padding:1rem">Aa</div>';
+            card.innerHTML = (!isDefault ? '<button class="template-delete" title="Eliminar">&times;</button>' : '')
+                + '<div class="template-preview" style="background:linear-gradient(135deg,' + pri + ',' + sec + ' 60%,' + acc + ')">'
+                + prev + '<div class="tpl-color-bar"><span style="background:' + pri + '"></span><span style="background:' + sec + '"></span><span style="background:' + acc + '"></span></div></div>'
+                + '<div class="template-name">' + esc(tpl.name) + '</div>'
+                + '<div class="template-author">' + esc(tpl.author) + ' &middot; v' + tpl.version + '</div>';
+            card.addEventListener('click', e => { if (!e.target.classList.contains('template-delete')) selectTemplate(tpl.id); });
+            const del = card.querySelector('.template-delete');
+            if (del) del.addEventListener('click', async e => {
+                e.stopPropagation();
+                if (!confirm('Eliminar "' + tpl.name + '"?')) return;
+                try {
+                    const r = await fetch('api/templates.php?id=' + tpl.id, {method:'DELETE'});
+                    const d = await r.json();
+                    if (d.success) { if (selectedTemplate === tpl.id) selectedTemplate = json.data.default; loadTemplates(); }
+                    else alert(d.message);
+                } catch(err) { alert('Error al eliminar'); }
+            });
+            grid.appendChild(card);
+        });
+        templatesLoaded = true;
+    } catch(err) {
+        console.error('Templates load error:', err);
+        grid.innerHTML = '<div class="template-loading">No se pudieron cargar las plantillas: ' + esc(err.message) + '</div>';
+    }
 }
 
-function updateProgress(percent) {
-    document.getElementById('loading-progress').style.width = percent + '%';
+function selectTemplate(id) {
+    selectedTemplate = id;
+    document.querySelectorAll('.template-card').forEach(c => c.classList.toggle('selected', c.dataset.templateId === id));
 }
 
-// =============================================
-// UTILIDADES
-// =============================================
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+async function importTemplate(e) {
+    const file = e.target.files[0]; if (!file) return;
+    const fd = new FormData(); fd.append('template', file);
+    try {
+        const resp = await fetch('api/templates.php?action=import', {method:'POST', body:fd});
+        const json = await resp.json();
+        alert(json.message);
+        if (json.success) { selectedTemplate = json.data.id; loadTemplates(); }
+    } catch(err) { alert('Error al importar'); }
+    e.target.value = '';
 }

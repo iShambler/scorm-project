@@ -1,0 +1,31 @@
+{
+    "id": "ugt-formacion",
+    "name": "UGT Formacion",
+    "description": "Estilo corporativo UGT con cabecera amarilla, fondo gris claro, tipografia Segoe UI y componentes con bordes redondeados.",
+    "author": "ARELANCE",
+    "version": "1.0",
+    "colors": {
+        "primary": "#F5C518",
+        "secondary": "#D4A911",
+        "accent": "#1A1A1A",
+        "bg": "#f5f5f5",
+        "card": "#ffffff",
+        "text": "#1A1A1A",
+        "text_light": "#4A4A4A",
+        "border": "#e0e0e0",
+        "success": "#28a745",
+        "danger": "#dc3545",
+        "warning": "#F5C518"
+    },
+    "fonts": {
+        "heading": "Segoe UI",
+        "body": "Segoe UI",
+        "code": "Consolas"
+    },
+    "settings": {
+        "radius": "16px",
+        "google_fonts_url": ""
+    },
+    "logo": "",
+    "portada_bg": ""
+}

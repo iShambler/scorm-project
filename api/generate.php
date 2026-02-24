@@ -80,38 +80,12 @@ try {
     // Fase 4: Recopilar imágenes
     $allImages = [];
     
-    // 4a. Imágenes del Word
-    $wordImagesDir = $data['metadata']['word_images_dir'] ?? '';
-    if (!empty($wordImagesDir) && is_dir($wordImagesDir)) {
-        $wordImgFiles = $data['metadata']['word_images'] ?? [];
-        foreach ($wordImgFiles as $imgFile) {
-            $imgPath = $wordImagesDir . '/' . $imgFile;
-            if (file_exists($imgPath)) {
-                $allImages[] = [
-                    'filename' => $imgFile,
-                    'data' => file_get_contents($imgPath),
-                    'mime' => mime_content_type($imgPath) ?: 'image/png',
-                    'source' => 'word'
-                ];
-            }
-        }
-        logError('DEBUG generate: ' . count($allImages) . ' Word images loaded');
-        
-        // Distribuir imágenes del Word entre secciones que no tengan imagen
-        $wordImgIdx = 0;
-        foreach ($units as &$wdUnit) {
-            if (!empty($wdUnit['secciones'])) {
-                foreach ($wdUnit['secciones'] as &$wdSec) {
-                    if (empty($wdSec['image']) && $wordImgIdx < count($allImages)) {
-                        $wdSec['image'] = $allImages[$wordImgIdx]['filename'];
-                        $wdSec['image_credit'] = '';
-                        $wordImgIdx++;
-                    }
-                }
-            }
-        }
-        unset($wdUnit, $wdSec);
-    }
+    // 4a. Imágenes del Word: NO se usan como imágenes decorativas del SCORM.
+    // Las imágenes del Word suelen ser capturas de texto, tablas o diagramas
+    // cuyo contenido ya está extraído como texto en el XML del documento.
+    // Usarlas como banners visuales queda mal y pierde contexto.
+    // Solo se usarán imágenes fotográficas de Unsplash.
+    logError('DEBUG generate: Word images SKIPPED (text/table captures, content already in text)');
     
     // 4b. Imágenes automáticas de Unsplash (por keyword de cada sección)
     $imageHelper = new ImageHelper(defined('UNSPLASH_API_KEY') ? UNSPLASH_API_KEY : '');
@@ -135,8 +109,9 @@ try {
         logError('DEBUG generate: Unsplash images fetched, total images now: ' . count($allImages));
     }
     
-    // Generar paquete SCORM
-    $generator = new SCORMGenerator($moduleConfig, $units, $allImages);
+    // Generar paquete SCORM con plantilla seleccionada
+    $templateId = $data['template_id'] ?? 'arelance-corporate';
+    $generator = new SCORMGenerator($moduleConfig, $units, $allImages, $templateId);
     $zipPath = $generator->generate();
     
     if (!file_exists($zipPath)) {

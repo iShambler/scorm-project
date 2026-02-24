@@ -3,29 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Conversor Word a SCORM - ARELANCE</title>
-    <link rel="stylesheet" href="assets/css/styles.css">
+    <title>SCORM Generator — ARELANCE</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 <body>
     <div class="app-container">
+
         <!-- Header -->
         <header class="app-header">
-            <div class="header-content">
-                <div class="logo">
-                    <span class="logo-icon">📄➡️📦</span>
-                    <div class="logo-text">
-                        <h1>Conversor Word a SCORM</h1>
-                        <span class="badge">Con IA</span>
-                    </div>
-                </div>
-                <p class="tagline">Transforma documentos Word en paquetes SCORM interactivos con inteligencia artificial</p>
+            <div class="brand">
+                <span class="brand-word"><span class="brand-letter">S</span>CORM</span>
+                <span class="brand-word"><span class="brand-letter">G</span>enerator</span>
             </div>
         </header>
-        
+
         <!-- Progress Steps -->
-        <div class="steps-container">
+        <nav class="steps-container">
             <div class="step active" data-step="1">
                 <div class="step-circle">1</div>
                 <span class="step-label">Cargar</span>
@@ -45,101 +40,106 @@
                 <div class="step-circle">4</div>
                 <span class="step-label">Descargar</span>
             </div>
-        </div>
+        </nav>
         
         <!-- Main Content -->
         <main class="main-content">
             
             <!-- Step 1: Upload -->
             <section class="card step-content" id="step-1">
-                <h2 class="card-title">
-                    <span class="icon">📤</span>
-                    Paso 1: Cargar documento Word
-                </h2>
-                
-                <div class="upload-zone" id="upload-zone">
-                    <div class="upload-icon">📘</div>
-                    <h3>Arrastra tu archivo Word aquí</h3>
-                    <p>o haz clic para seleccionar</p>
-                    <span class="upload-hint">Soporta archivos .docx (máx. 50MB)</span>
-                    <input type="file" id="file-input" accept=".docx" hidden>
-                </div>
-                
-                <div class="file-preview hidden" id="file-preview">
-                    <div class="file-icon">✅</div>
-                    <div class="file-info">
-                        <span class="file-name" id="file-name"></span>
-                        <span class="file-size" id="file-size"></span>
+                <div class="card-center">
+                    <h2 class="card-title">Sube tu documento Word</h2>
+                    <p class="card-desc">Genera un paquete SCORM 1.2 interactivo a partir de la estructura de tu documento.</p>
+                    
+                    <div class="upload-zone" id="upload-zone">
+                        <div class="upload-icon">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        </div>
+                        <p class="upload-text">Arrastra tu archivo aqui o <span class="upload-link">selecciona</span></p>
+                        <span class="upload-hint">.docx &mdash; max. 50 MB</span>
+                        <input type="file" id="file-input" accept=".docx" hidden>
                     </div>
-                    <button class="btn btn-danger btn-sm" id="btn-remove-file">✕</button>
+                    
+                    <div class="file-preview hidden" id="file-preview">
+                        <div class="file-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        </div>
+                        <div class="file-info">
+                            <span class="file-name" id="file-name"></span>
+                            <span class="file-size" id="file-size"></span>
+                        </div>
+                        <button class="btn-icon" id="btn-remove-file" title="Eliminar">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+
+                    <!-- Hidden AI check, no visible banner -->
+                    <div id="ai-status" style="display:none"></div>
+                    
+                    <button class="btn btn-primary btn-lg btn-full" id="btn-analyze" disabled>
+                        Analizar y continuar
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                    </button>
                 </div>
-                
-                <div class="info-box info">
-                    <h4>💡 Estructura recomendada del documento</h4>
-                    <ul>
-                        <li>Título del módulo con duración (ej: "Módulo 4: Proyecto final (50h)")</li>
-                        <li>Unidades didácticas marcadas como "UNIDAD DIDÁCTICA X"</li>
-                        <li>Secciones claras con títulos</li>
-                        <li>Bloques de código para ejemplos técnicos</li>
-                    </ul>
-                </div>
-                
-                <div class="info-box warning" id="ai-status">
-                    <h4>🤖 Estado de la IA</h4>
-                    <p>Verificando conexión con Claude API...</p>
-                </div>
-                
-                <button class="btn btn-primary btn-lg btn-block" id="btn-analyze" disabled>
-                    <span class="btn-icon">🔍</span>
-                    Analizar documento con IA
-                </button>
             </section>
             
             <!-- Step 2: Configure -->
             <section class="card step-content hidden" id="step-2">
-                <h2 class="card-title">
-                    <span class="icon">⚙️</span>
-                    Paso 2: Configurar módulo
-                </h2>
+                <h2 class="card-title">Configuracion del modulo</h2>
                 
                 <div class="form-grid">
                     <div class="form-group">
-                        <label for="cfg-code">Código del módulo</label>
-                        <input type="text" id="cfg-code" placeholder="Ej: PROY_M4">
+                        <label for="cfg-code">Codigo</label>
+                        <input type="text" id="cfg-code" placeholder="MOD_01">
                     </div>
                     <div class="form-group">
-                        <label for="cfg-hours">Duración total (horas)</label>
+                        <label for="cfg-hours">Horas</label>
                         <input type="number" id="cfg-hours" min="1" value="50">
                     </div>
                     <div class="form-group full">
-                        <label for="cfg-title">Título del módulo</label>
+                        <label for="cfg-title">Titulo del modulo</label>
                         <input type="text" id="cfg-title" placeholder="Ej: Proyecto final integrador">
                     </div>
                     <div class="form-group full">
-                        <label for="cfg-company">Empresa / Copyright</label>
+                        <label for="cfg-company">Empresa</label>
                         <input type="text" id="cfg-company" value="ARELANCE S.L.">
                     </div>
                 </div>
                 
                 <hr class="divider">
                 
-                <h3 class="section-title">📚 Unidades detectadas</h3>
+                <h3 class="section-title">Unidades detectadas</h3>
                 <div class="units-list" id="units-list"></div>
                 
                 <div class="summary-grid" id="summary-stats"></div>
                 
+                <hr class="divider">
+                
+                <h3 class="section-title">Plantilla de estilo</h3>
+                <div class="templates-grid" id="templates-grid">
+                    <div class="template-loading">Cargando plantillas...</div>
+                </div>
+                <div class="template-actions">
+                    <label class="btn btn-ghost btn-sm" for="template-import-input">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Importar plantilla
+                    </label>
+                    <input type="file" id="template-import-input" accept=".zip" hidden>
+                </div>
+                
                 <div class="btn-group">
-                    <button class="btn btn-secondary" onclick="goToStep(1)">← Volver</button>
-                    <button class="btn btn-primary btn-lg" onclick="goToStep(3)">Continuar →</button>
+                    <button class="btn btn-ghost" onclick="goToStep(1)">Volver</button>
+                    <button class="btn btn-primary btn-lg" onclick="goToStep(3)">
+                        Continuar
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                    </button>
                 </div>
             </section>
             
             <!-- Step 3: Review -->
             <section class="card step-content hidden" id="step-3">
-                <h2 class="card-title">
-                    <span class="icon">👁️</span>
-                    Paso 3: Revisar contenido
-                </h2>
+                <h2 class="card-title">Revisar estructura</h2>
+                <p class="card-desc">Esta es la estructura generada por la IA. Revisa que el contenido esté bien organizado antes de generar el SCORM.</p>
                 
                 <div class="tabs" id="units-tabs">
                     <div class="tabs-header" id="tabs-header"></div>
@@ -147,45 +147,39 @@
                 </div>
                 
                 <div class="btn-group">
-                    <button class="btn btn-secondary" onclick="goToStep(2)">← Volver</button>
-                    <button class="btn btn-success btn-lg" id="btn-generate">
-                        <span class="btn-icon">🚀</span>
-                        Generar paquete SCORM
+                    <button class="btn btn-ghost" onclick="goToStep(2)">Volver</button>
+                    <button class="btn btn-accent btn-lg" id="btn-generate">
+                        Generar SCORM
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     </button>
                 </div>
             </section>
             
             <!-- Step 4: Download -->
             <section class="card step-content hidden" id="step-4">
-                <h2 class="card-title">
-                    <span class="icon">✅</span>
-                    Paso 4: Descargar
-                </h2>
-                
-                <div class="success-box">
-                    <div class="success-icon">🎉</div>
-                    <h3>¡Paquete SCORM generado correctamente!</h3>
-                    <p>Tu contenido formativo está listo para importar en Moodle u otro LMS compatible con SCORM 1.2.</p>
+                <div class="card-center">
+                    <div class="success-check">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <h2 class="card-title">Paquete generado</h2>
+                    <p class="card-desc">Listo para importar en Moodle u otro LMS compatible con SCORM 1.2</p>
+                    
+                    <div class="summary-grid" id="final-stats"></div>
+                    
+                    <button class="btn btn-accent btn-lg btn-full" id="btn-download">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Descargar SCORM
+                    </button>
+                    
+                    <button class="btn btn-ghost btn-full mt-3" onclick="resetApp()">Convertir otro documento</button>
                 </div>
-                
-                <div class="summary-grid" id="final-stats"></div>
-                
-                <button class="btn btn-success btn-lg btn-block" id="btn-download">
-                    <span class="btn-icon">📥</span>
-                    Descargar SCORM
-                </button>
-                
-                <button class="btn btn-secondary btn-block" onclick="resetApp()" style="margin-top: 1rem;">
-                    <span class="btn-icon">🔄</span>
-                    Convertir otro documento
-                </button>
             </section>
             
         </main>
         
         <!-- Footer -->
         <footer class="app-footer">
-            <p>© 2025 ARELANCE S.L. - Conversor Word a SCORM con IA</p>
+            <p>ARELANCE &middot; SCORM Generator</p>
         </footer>
     </div>
     
@@ -194,7 +188,7 @@
         <div class="loading-content">
             <div class="spinner"></div>
             <h3 id="loading-title">Procesando...</h3>
-            <p id="loading-message">Por favor, espera mientras procesamos tu documento.</p>
+            <p id="loading-message">Analizando estructura del documento</p>
             <div class="progress-bar">
                 <div class="progress-fill" id="loading-progress"></div>
             </div>

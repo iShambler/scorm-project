@@ -21,12 +21,14 @@ class SCORMGenerator
     private array $units;
     private string $tempPath;
     private array $images;
+    private string $templateId;
 
-    public function __construct(array $moduleConfig, array $units, array $images = [])
+    public function __construct(array $moduleConfig, array $units, array $images = [], string $templateId = 'arelance-corporate')
     {
         $this->moduleConfig = $moduleConfig;
         $this->units = $units;
         $this->images = $images;
+        $this->templateId = $templateId;
         $this->tempPath = TEMP_PATH . '/' . generateUniqueId();
         foreach (['', '/css', '/js', '/scos', '/img'] as $d) {
             @mkdir($this->tempPath . $d, 0755, true);
@@ -182,6 +184,7 @@ class SCORMGenerator
 <nav class="topnav">
   <a href="#" class="abre menuicono">&#9776;</a>
   <span class="topnav-title">Ud.&nbsp;' . $udN . '</span>
+  <div class="topnav-units">' . $this->buildUnitNav($idx) . '</div>
   <span class="topnav-empresa">' . $emp . '</span>
 </nav>
 
@@ -233,7 +236,7 @@ class SCORMGenerator
             'id' => 'step-index', 'label' => 'Ud. ' . $udN . ': ' . $unit['titulo'],
             'epi' => false, 'hide' => false,
             'html' => $this->wrapStep('step-index', false, true,
-                '<h3 class="titleicon">' . self::svg('list', '#F05726', 24) . ' &Iacute;ndice</h3>'
+                '<h3>&Iacute;ndice</h3>'
                 . '<div class="card-box intro"><h2 class="titulounidad"><span class="text-accent">'
                 . str_pad($udN, 2, '0', STR_PAD_LEFT) . '</span> ' . $this->e($unit['titulo']) . '</h2>'
                 . $lix . '<p class="duracion-badge">&#9201; ' . ($unit['duracion'] ?? '') . ' horas</p></div>')
@@ -246,24 +249,20 @@ class SCORMGenerator
                 $sn = $si + 1;
                 $secId = 'step-' . $udN . '-' . chr(97 + $si);
                 $secTitle = $this->e($sec['titulo']);
+                $secHeader = '<hr class="line-accent"><h3><span class="sec-num">' . $udN . '.' . $sn . '.</span> ' . $secTitle . '</h3>';
 
-                // Fase 2: si tiene bloques clasificados por IA, renderizar con componentes
-                if ($isEnriched && !empty($sec['bloques'])) {
-                    $fc = $this->renderBlocks($sec['bloques']);
-                    // Icono de sección desde Iconify
-                    $secIcon = '';
-                    $iconKw = $sec['icono_keyword'] ?? '';
-                    if (!empty($iconKw)) {
-                        $secIcon = IconifyHelper::getIcon($iconKw, 32, COLOR_ACCENT);
-                    }
-                    if (empty($secIcon)) {
-                        $secIcon = self::svg('book', COLOR_ACCENT, 24);
-                    }
-                    $secHeader = '<hr class="line-accent"><h3 class="titleicon sec-header-icon">' . $secIcon . ' <span class="sec-num">' . $udN . '.' . $sn . '.</span> ' . $secTitle . '</h3>';
+                // Determinar bloques: buscar en 3 formatos posibles
+                $blocks = $sec['bloques'] ?? [];
+                if (empty($blocks) && !empty($sec['contenido_estructurado'])) {
+                    // Nuevo formato: convertir contenido_estructurado a bloques compatibles
+                    $blocks = $this->convertStructuredToBlocks($sec['contenido_estructurado']);
+                }
 
-                    // Split into pages if very long
+                if (!empty($blocks)) {
+                    // Renderizar con componentes visuales
+                    $fc = $this->renderBlocks($blocks);
                     if (mb_strlen($fc) > 8000) {
-                        $halfBlocks = array_chunk($sec['bloques'], (int)ceil(count($sec['bloques']) / 2));
+                        $halfBlocks = array_chunk($blocks, (int)ceil(count($blocks) / 2));
                         foreach ($halfBlocks as $pi => $blockChunk) {
                             $pid = $secId . ($pi > 0 ? '_' . ($pi + 1) : '');
                             $isFirst = ($pi === 0);
@@ -286,7 +285,7 @@ class SCORMGenerator
                         ];
                     }
                 } else {
-                    // Fallback: formato regex (Fase 1)
+                    // Fallback: texto plano con formateo regex
                     $content = $sec['contenido'] ?? '';
                     $parts = $this->splitContent($content, 3000);
                     foreach ($parts as $pi => $part) {
@@ -298,8 +297,7 @@ class SCORMGenerator
                             'label' => $isFirst ? $udN . '.' . $sn . '. ' . $sec['titulo'] : $udN . '.' . $sn . '.',
                             'epi' => true, 'hide' => !$isFirst,
                             'html' => $this->wrapStep($pid, true, true,
-                                '<hr class="line-accent"><h3><span class="sec-num">' . $udN . '.' . $sn . '.</span> ' . $secTitle . '</h3>'
-                                . '<div class="content-body">' . $fc . '</div>')
+                                $secHeader . '<div class="content-body">' . $fc . '</div>')
                         ];
                     }
                 }
@@ -316,7 +314,7 @@ class SCORMGenerator
             $steps[] = [
                 'id' => 'step-code', 'label' => 'Ejemplos de c&oacute;digo', 'epi' => true, 'hide' => false,
                 'html' => $this->wrapStep('step-code', true, true,
-                    '<hr class="line-accent"><h3 class="titleicon">' . self::svg('code', '#F05726', 24) . ' Ejemplos de c&oacute;digo</h3>' . $ch)
+                    '<hr class="line-accent"><h3>Ejemplos de c&oacute;digo</h3>' . $ch)
             ];
         }
 
@@ -333,7 +331,7 @@ class SCORMGenerator
             $steps[] = [
                 'id' => 'step-flashcards', 'label' => 'Conceptos clave', 'epi' => true, 'hide' => false,
                 'html' => $this->wrapStep('step-flashcards', true, true,
-                    '<hr class="line-accent"><h3 class="titleicon">' . self::svg('brain', '#F05726', 24) . ' Conceptos clave</h3>' . $fh)
+                    '<hr class="line-accent"><h3>Conceptos clave</h3>' . $fh)
             ];
         }
 
@@ -362,7 +360,7 @@ class SCORMGenerator
             $steps[] = [
                 'id' => 'step-matching', 'label' => 'Relaciona conceptos', 'epi' => true, 'hide' => true,
                 'html' => $this->wrapStep('step-matching', true, true,
-                    '<hr class="line-accent"><h3 class="titleicon">' . self::svg('puzzle', '#F05726', 24) . ' Relaciona conceptos</h3>' . $mh)
+                    '<hr class="line-accent"><h3>Relaciona conceptos</h3>' . $mh)
             ];
         }
 
@@ -383,7 +381,7 @@ class SCORMGenerator
                     'id' => 'step-auto' . $qn, 'label' => 'Autoevaluaci&oacute;n ' . $qn,
                     'epi' => true, 'hide' => ($qn > 1),
                     'html' => $this->wrapStep('step-auto' . $qn, true, true,
-                        '<hr class="line-accent"><h3 class="titleicon">' . self::svg('check', '#F05726', 24) . ' Autoevaluaci&oacute;n ' . $qn . '/' . $tq . '</h3>'
+                        '<hr class="line-accent"><h3>Autoevaluaci&oacute;n ' . $qn . '/' . $tq . '</h3>'
                         . '<div class="card-box"><p class="pregunta">' . $this->e($q['pregunta']) . '</p>' . $oh
                         . '<center><button class="btn-action mt-3" onclick="capturarQ(' . $qn . ',\'' . $eo . '\',\'' . $eb . '\')">Comprobar</button></center>'
                         . '<div id="resultado_q' . $qn . '"></div></div>')
@@ -403,7 +401,7 @@ class SCORMGenerator
         $steps[] = [
             'id' => 'step-conclusion', 'label' => 'Conclusiones', 'epi' => false, 'hide' => true,
             'html' => $this->wrapStep('step-conclusion', true, true,
-                '<h3 class="titleicon">' . self::svg('clipboard', '#F05726', 24) . ' Conclusiones</h3>'
+                '<h3>Conclusiones</h3>'
                 . '<div class="card-box intro">' . $conc . '</div>')
         ];
 
@@ -411,12 +409,12 @@ class SCORMGenerator
         $nav = '<div class="final-nav">';
         if ($idx > 0) {
             $p = $this->units[$idx - 1];
-            $nav .= '<a href="' . $p['filename'] . '_container.html" class="btn-nav">&larr; UD ' . $p['numero'] . '</a>';
+            $nav .= '<a href="' . $p['filename'] . '.html" data-container="' . $p['filename'] . '_container.html" class="btn-nav ud-link">&larr; UD ' . $p['numero'] . '</a>';
         }
         $nav .= '<button class="btn-nav back">&#127968; Inicio</button>';
         if ($idx < $totalUnits - 1) {
             $n = $this->units[$idx + 1];
-            $nav .= '<a href="' . $n['filename'] . '_container.html" class="btn-nav">UD ' . $n['numero'] . ' &rarr;</a>';
+            $nav .= '<a href="' . $n['filename'] . '.html" data-container="' . $n['filename'] . '_container.html" class="btn-nav ud-link">UD ' . $n['numero'] . ' &rarr;</a>';
         } else {
             $nav .= '<span class="btn-nav completed">&#10003; M&oacute;dulo completado</span>';
         }
@@ -440,6 +438,69 @@ class SCORMGenerator
     {
         return '<div class="row setup-content" id="' . $id . '"><div class="col-12">' . $inner . '</div>'
             . ($prev ? '<a class="prevBtn"></a>' : '') . ($next ? '<a class="nextBtn"></a>' : '') . '</div>';
+    }
+
+    // =====================================================================
+    //  CONVERT contenido_estructurado → bloques (bridge between formats)
+    // =====================================================================
+    private function convertStructuredToBlocks(array $structured): array
+    {
+        $blocks = [];
+        foreach ($structured as $item) {
+            $tipo = $item['tipo'] ?? 'parrafo';
+            $block = ['tipo' => $tipo];
+
+            switch ($tipo) {
+                case 'definicion':
+                    $block['termino'] = $item['termino'] ?? '';
+                    $block['contenido'] = $item['texto'] ?? $item['contenido'] ?? '';
+                    break;
+                case 'lista':
+                    $block['contenido'] = $item['titulo'] ?? '';
+                    $block['items'] = $item['items'] ?? [];
+                    break;
+                case 'tabla':
+                    // Convert filas (array of arrays) to pipe-separated strings
+                    if (!empty($item['filas'])) {
+                        $block['items'] = array_map(function($row) {
+                            return implode(' | ', $row);
+                        }, $item['filas']);
+                    } else {
+                        $block['items'] = $item['items'] ?? [];
+                    }
+                    $block['contenido'] = '';
+                    break;
+                case 'comparativa':
+                    $block['items'] = $item['items'] ?? [];
+                    $block['contenido'] = $item['texto'] ?? $item['contenido'] ?? '';
+                    break;
+                case 'importante':
+                    $block['tipo'] = 'tip_importante';
+                    $block['contenido'] = $item['texto'] ?? $item['contenido'] ?? '';
+                    $block['etiqueta'] = 'Importante';
+                    break;
+                case 'sabias_que':
+                    $block['tipo'] = 'tip_saber';
+                    $block['contenido'] = $item['texto'] ?? $item['contenido'] ?? '';
+                    $block['etiqueta'] = 'Sabías que';
+                    break;
+                case 'ejemplo':
+                    $block['tipo'] = 'ejemplo';
+                    $block['contenido'] = $item['texto'] ?? $item['contenido'] ?? '';
+                    $block['etiqueta'] = 'Ejemplo';
+                    break;
+                case 'proceso':
+                    $block['items'] = $item['items'] ?? [];
+                    $block['contenido'] = $item['texto'] ?? $item['contenido'] ?? '';
+                    break;
+                default: // parrafo and anything else
+                    $block['contenido'] = $item['texto'] ?? $item['contenido'] ?? '';
+                    break;
+            }
+
+            $blocks[] = $block;
+        }
+        return $blocks;
     }
 
     // =====================================================================
@@ -499,15 +560,20 @@ class SCORMGenerator
 
                 case 'proceso':
                     $aid = 'proc' . ($accN++);
-                    $svgIcons = ['layers','tool','target','chart','shield','puzzle'];
                     $html .= '<div class="accordion-container">';
                     foreach ($items as $pi => $paso) {
                         $cid = $aid . 'p' . $pi;
-                        $ico = $svgIcons[$pi % count($svgIcons)];
+                        // Extraer titulo corto: antes del primer punto, o primeras 60 chars
+                        $dotPos = mb_strpos($paso, '. ');
+                        if ($dotPos !== false && $dotPos < 80) {
+                            $accTitle = mb_substr($paso, 0, $dotPos);
+                        } else {
+                            $spacePos = mb_strrpos(mb_substr($paso, 0, 60), ' ');
+                            $accTitle = $spacePos ? mb_substr($paso, 0, $spacePos) . '...' : mb_substr($paso, 0, 60) . '...';
+                        }
                         $html .= '<div class="accordion-item">'
                             . '<div class="accordion-header" onclick="toggleAccordion(\'' . $cid . '\')">' 
-                            . '<div class="acc-icon-wrap">' . self::svg($ico, '#fff', 20) . '</div>'
-                            . '<span class="acc-title">Paso ' . ($pi + 1) . ': ' . $this->e(mb_substr($paso, 0, 80)) . '</span>'
+                            . '<span class="acc-title">Paso ' . ($pi + 1) . ': ' . $this->e($accTitle) . '</span>'
                             . '<span class="accordion-arrow">&#8594;</span></div>'
                             . '<div class="accordion-body" id="' . $cid . '"><p>' . $this->e($paso) . '</p></div></div>';
                     }
@@ -532,6 +598,38 @@ class SCORMGenerator
                 case 'ejemplo':
                     $html .= '<div class="idevice saber"><div class="idevice-icon">' . self::svg('clipboard', '#16a34a', 24) . '</div>'
                         . '<p><strong>' . $this->e($etiqueta ?: 'Ejemplo') . ':</strong> ' . $this->e($contenido) . '</p></div>';
+                    break;
+
+                case 'tabla':
+                    if (!empty($items)) {
+                        $html .= '<div class="table-responsive"><table class="tabla-contenido">';
+                        foreach ($items as $ri => $row) {
+                            $cells = array_map('trim', explode('|', $row));
+                            $tag = ($ri === 0) ? 'th' : 'td';
+                            $html .= '<tr>';
+                            foreach ($cells as $cell) {
+                                $html .= '<' . $tag . '>' . $this->e($cell) . '</' . $tag . '>';
+                            }
+                            $html .= '</tr>';
+                        }
+                        $html .= '</table></div>';
+                    } elseif (!empty($contenido)) {
+                        // Fallback: contenido como texto con formato tabla
+                        $lines = preg_split('/\n+/', $contenido);
+                        $html .= '<div class="table-responsive"><table class="tabla-contenido">';
+                        foreach ($lines as $ri => $line) {
+                            $line = preg_replace('/^\[Tabla:\s*/', '', trim($line));
+                            $line = rtrim($line, ']');
+                            $cells = array_map('trim', explode('|', $line));
+                            $tag = ($ri === 0) ? 'th' : 'td';
+                            $html .= '<tr>';
+                            foreach ($cells as $cell) {
+                                $html .= '<' . $tag . '>' . $this->e($cell) . '</' . $tag . '>';
+                            }
+                            $html .= '</tr>';
+                        }
+                        $html .= '</table></div>';
+                    }
                     break;
 
                 case 'codigo':
@@ -623,10 +721,8 @@ class SCORMGenerator
                 $html .= '<div class="accordion-container">';
                 foreach ($g['items'] as $di => $d) {
                 $cid = $aid . 'c' . $di;
-                $ico = $svgPool[$di % count($svgPool)];
                 $html .= '<div class="accordion-item">'
                 . '<div class="accordion-header" onclick="toggleAccordion(\'' . $cid . '\')">' 
-                        . '<div class="acc-icon-wrap">' . self::svg($ico, '#fff', 20) . '</div>'
                         . '<span class="acc-title">' . $this->e($d['term']) . '</span>'
                             . '<span class="accordion-arrow">&#8594;</span></div>'
                             . '<div class="accordion-body" id="' . $cid . '"><p>' . $this->e($d['text']) . '</p></div></div>';
@@ -733,6 +829,10 @@ document.querySelectorAll('.cierra_menu').forEach(function(e){e.addEventListener
 var bd=document.querySelector('.overlaymenu-backdrop');if(bd){bd.addEventListener('click',function(){closeMenu()})};
 document.querySelectorAll('.tema').forEach(function(e){e.addEventListener('click',function(){window.scrollTo(0,0);var h=document.querySelector('.home'),c=document.querySelector('.contenido');if(h)h.style.display='none';if(c)c.style.display='block';closeMenu()})});
 document.querySelectorAll('.back').forEach(function(e){e.addEventListener('click',function(ev){ev.preventDefault();var h=document.querySelector('.home'),c=document.querySelector('.contenido');if(h)h.style.display='block';if(c)c.style.display='none';closeMenu()})});
+// Detectar si estamos dentro de un LMS (iframe con SCORM API) y ajustar enlaces entre UDs
+var inLMS=false;
+try{inLMS=window.parent&&window.parent!==window&&(typeof window.parent.doLMSSetValue==='function'||typeof window.parent.API!=='undefined')}catch(e){inLMS=true}
+if(inLMS){document.querySelectorAll('a.ud-link').forEach(function(a){var c=a.getAttribute('data-container');if(c)a.setAttribute('href',c)})}
 });
 JSEND;
         file_put_contents($this->tempPath . '/js/nav.js', $js);
@@ -754,9 +854,29 @@ JSEND;
     }
 
     // =====================================================================
-    //  CSS — Professional styles (APTE-inspired, Arelance-branded)
+    //  CSS — Cargado desde plantilla (TemplateManager)
     // =====================================================================
     private function writeCSS(): void
+    {
+        require_once __DIR__ . '/TemplateManager.php';
+        $tm = new TemplateManager();
+
+        try {
+            $css = $tm->buildCSS($this->templateId);
+            // Copiar assets de la plantilla (logo, fondos, fuentes)
+            $tm->copyAssets($this->templateId, $this->tempPath);
+        } catch (\Exception $e) {
+            // Fallback: CSS mínimo si falla la plantilla
+            $css = $this->getFallbackCSS();
+        }
+
+        file_put_contents($this->tempPath . '/css/estilos.css', $css);
+    }
+
+    /**
+     * CSS de emergencia si no se puede cargar ninguna plantilla
+     */
+    private function getFallbackCSS(): string
     {
         $primary   = defined('COLOR_PRIMARY') ? COLOR_PRIMARY : '#143554';
         $secondary = defined('COLOR_SECONDARY') ? COLOR_SECONDARY : '#1a4a6e';
@@ -810,10 +930,15 @@ img{max-width:100%}.d-none{display:none!important}
 .steps-step a{color:rgba(255,255,255,.9);font-weight:400;font-size:1rem;display:block;padding:.4rem 0;transition:all .2s;text-decoration:none}
 .steps-step a:hover{color:#fff;padding-left:8px;text-decoration:none}
 .steps-step .epigrafe{font-size:.85rem;padding-left:1.5rem;opacity:.8;font-weight:300}
-.topnav{position:fixed;top:0;left:0;right:0;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.08);display:flex;align-items:center;z-index:100;height:50px;padding:0 1rem}
-.menuicono{font-size:1.4rem;color:var(--primary);text-decoration:none;margin-right:1rem;padding:.5rem}
-.topnav-title{flex:1;font-weight:600;color:var(--primary);font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.topnav-empresa{font-size:.8rem;color:var(--text-light);font-weight:500}
+.topnav{position:fixed;top:0;left:0;right:0;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.08);display:flex;align-items:center;z-index:100;height:50px;padding:0 1rem;gap:.5rem}
+.menuicono{font-size:1.4rem;color:var(--primary);text-decoration:none;padding:.5rem}
+.topnav-title{font-weight:600;color:var(--primary);font-size:.95rem;white-space:nowrap}
+.topnav-units{display:flex;align-items:center;gap:4px;flex:1;justify-content:center;overflow-x:auto}
+.topnav-ud{display:inline-flex;align-items:center;justify-content:center;padding:.25rem .7rem;border-radius:20px;font-size:.78rem;font-weight:600;color:var(--text-light);background:var(--bg);text-decoration:none;transition:all .2s;white-space:nowrap;border:1.5px solid transparent}
+.topnav-ud:hover{color:var(--primary);background:#e8edf2;text-decoration:none}
+.topnav-ud.ud-active{color:#fff;background:var(--primary);border-color:var(--primary)}
+.topnav-empresa{font-size:.8rem;color:var(--text-light);font-weight:500;white-space:nowrap}
+@media(max-width:600px){.topnav-ud{padding:.2rem .5rem;font-size:.7rem}.topnav-empresa{display:none}}
 .home{padding-top:60px;min-height:100vh}.main{max-width:900px;margin:0 auto;padding:2rem 1.5rem}
 .site__title{font-size:2rem;color:var(--primary);margin-bottom:.5rem}
 .site__separator{width:80px;height:4px;background:var(--accent);border-radius:2px;margin-bottom:1.5rem}
@@ -842,14 +967,14 @@ img{max-width:100%}.d-none{display:none!important}
 .icon-bullet{font-size:1.3rem}.titleicon{display:flex;align-items:center;gap:.5rem}
 .sec-header-icon svg{flex-shrink:0}
 .sec-banner{border-radius:var(--radius);overflow:hidden;position:relative;margin-bottom:1.5rem}
-.sec-banner img{display:block;object-fit:cover;width:100%}
+.sec-banner img{display:block;width:100%;max-height:280px;object-fit:cover}
 .sec-img-credit{position:absolute;bottom:8px;right:12px;font-size:.72rem;color:#fff;background:rgba(0,0,0,.5);padding:3px 10px;border-radius:4px;z-index:2}
-.layout-full{height:240px}.layout-full img{height:240px}
-.layout-card{margin:0 auto 1.5rem;max-width:580px;text-align:center;background:var(--card);padding:.5rem .5rem .2rem;box-shadow:var(--shadow);border-radius:var(--radius)}.layout-card img{height:220px;border-radius:8px}
+.layout-full img{max-height:260px}
+.layout-card{margin:0 auto 1.5rem;max-width:580px;text-align:center;background:var(--card);padding:.5rem .5rem .2rem;box-shadow:var(--shadow);border-radius:var(--radius)}.layout-card img{max-height:240px;object-fit:contain;border-radius:8px}
 .sec-img-caption{display:block;font-size:.75rem;color:var(--text-light);margin-top:.4rem;padding-bottom:.3rem;font-style:italic}
-.layout-gradient{height:260px}.layout-gradient img{height:260px}
+.layout-gradient img{max-height:280px}
 .sec-gradient-overlay{position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,.35) 0%,transparent 50%)}
-@media(max-width:600px){.layout-full,.layout-gradient{height:180px}.layout-full img,.layout-gradient img{height:180px}.layout-card img{height:160px}}
+@media(max-width:600px){.sec-banner img{max-height:200px}.layout-card img{max-height:180px}}
 .idevice{animation:fadeSlideIn .4s ease-out}
 .accordion-item{animation:fadeSlideIn .3s ease-out}
 .accordion-item:nth-child(2){animation-delay:.05s}
@@ -894,6 +1019,12 @@ img{max-width:100%}.d-none{display:none!important}
 .idevice.saber{background:#e8f5e9;border-left:4px solid var(--success)}
 .idevice.def{background:#e3f2fd;border-left:4px solid var(--primary)}
 .idevice.practica{background:#fce4ec;border-left:4px solid #e91e63}
+.table-responsive{overflow-x:auto;margin:1.5rem 0}
+.tabla-contenido{width:100%;border-collapse:collapse;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);font-size:.93rem}
+.tabla-contenido th{background:var(--primary);color:#fff;padding:.75rem 1rem;text-align:left;font-weight:600;font-size:.9rem}
+.tabla-contenido td{padding:.65rem 1rem;border-bottom:1px solid var(--border);background:var(--card)}
+.tabla-contenido tr:nth-child(even) td{background:var(--bg)}
+.tabla-contenido tr:hover td{background:#e8edf2}
 .code-block{margin:1rem 0;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
 .code-header{background:var(--primary);color:#fff;padding:.5rem 1rem;font-size:.8rem;font-weight:600;letter-spacing:1px}
 .code-block pre{margin:0;padding:1.2rem;background:#1e1e2e;color:#cdd6f4;overflow-x:auto;font-size:.85rem;line-height:1.6;font-family:'Fira Code','Courier New',monospace}
@@ -933,7 +1064,7 @@ img{max-width:100%}.d-none{display:none!important}
 .alert-warning{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
 .btn-action{background:var(--accent);color:#fff;border:none;padding:.7rem 2rem;border-radius:50px;font-weight:600;font-size:.95rem;cursor:pointer;transition:all .3s}
 .btn-action:hover{background:var(--primary);transform:translateY(-1px)}
-.prevBtn,.nextBtn{position:fixed;top:50%;transform:translateY(-50%);width:48px;height:48px;border-radius:50%;background:var(--card);box-shadow:0 4px 15px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:50;transition:all .3s;text-decoration:none;border:2px solid var(--border);font-size:0;line-height:0;overflow:hidden}
+.prevBtn,.nextBtn{position:fixed;top:50%;transform:translateY(-50%);width:48px;height:48px;border-radius:50%;background:var(--card);box-shadow:0 4px 15px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:50;transition:background .3s,border-color .3s;text-decoration:none;border:2px solid var(--border);font-size:0;line-height:0;overflow:hidden;animation:none!important}
 .prevBtn{left:12px}.nextBtn{right:12px}
 .prevBtn:hover,.nextBtn:hover{background:var(--primary);border-color:var(--primary)}
 .prevBtn::after,.nextBtn::after{content:"";display:block;width:10px;height:10px;border-top:2.5px solid var(--primary);border-right:2.5px solid var(--primary)}
@@ -956,7 +1087,7 @@ img{max-width:100%}.d-none{display:none!important}
 .tab-panel{padding:1.2rem 1.5rem;font-size:.95rem;line-height:1.7}
 @media(max-width:600px){.matching-game{flex-direction:column}.flashcards-grid{grid-template-columns:1fr 1fr}.portada__title{font-size:1.6rem}.tabs-nav{flex-wrap:wrap}.tab-btn{min-width:50%}}
 CSSEND;
-        file_put_contents($this->tempPath . '/css/estilos.css', $css);
+        return $css;
     }
 
     // =====================================================================
@@ -1026,6 +1157,20 @@ CSSEND;
             is_dir($path) ? $this->deleteDir($path) : unlink($path);
         }
         rmdir($dir);
+    }
+
+    /**
+     * Construye la barra de navegación entre unidades en el header
+     */
+    private function buildUnitNav(int $currentIdx): string
+    {
+        $html = '';
+        foreach ($this->units as $i => $u) {
+            $active = ($i === $currentIdx) ? ' ud-active' : '';
+            // data-container para LMS, href directo para preview local
+            $html .= '<a href="' . $u['filename'] . '.html" data-container="' . $u['filename'] . '_container.html" class="topnav-ud ud-link' . $active . '" title="' . $this->e($u['titulo']) . '">Ud.' . $u['numero'] . '</a>';
+        }
+        return $html;
     }
 
     private function e(string $text): string

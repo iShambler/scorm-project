@@ -92,60 +92,193 @@ try {
     $analysisResult = null;
     
     if ($useAI) {
-        // Usar IA para análisis avanzado
         try {
             $aiProcessor = new AIProcessor();
-            $analysisResult = $aiProcessor->analyzeDocument($documentData['text']);
             
-            // Log de debug para verificar matching
-            logError('DEBUG structure units: ' . json_encode(array_map(function($u) { return ['n' => $u['number'], 'title' => substr($u['title'], 0, 30), 'content_len' => strlen(implode('', $u['content'] ?? []))]; }, $structure['units'])));
-            logError('DEBUG AI units: ' . json_encode(array_map(function($u) { return ['n' => $u['numero'], 'title' => substr($u['titulo'], 0, 30), 'secciones' => count($u['secciones'] ?? [])]; }, $analysisResult['unidades'])));
+            // ============================================================
+            // NUEVO FLUJO: Estructuración por unidades
+            // 1. Detectar unidades (desde estructura del Word)
+            // 2. Por cada UD → structureUnit() (la IA organiza en secciones+bloques)
+            // 3. Por cada UD → generateQuestions()
+            // ============================================================
             
-            // Obtener contenido por UD: matching inteligente
-            $unitContents = matchUnitContents($analysisResult['unidades'], $structure);
+            // Paso 1: Obtener unidades del Word con su contenido
+            $outline = $wordProcessor->buildStructuredOutline();
+            logError('DEBUG outline: ' . count($outline['units']) . ' units detected, module="' . $outline['module_title'] . '"');
             
-            // Generar preguntas adicionales para cada unidad
-            foreach ($analysisResult['unidades'] as &$unit) {
-                $unitContent = $unitContents[(int)$unit['numero']] ?? '';
+            // ============================================================
+            // SMART MERGING: Si el documento es pequeño, reducir UDs
+            // Un documento de <5000 chars no necesita 6 unidades.
+            // Regla: ~5000 chars mínimo por UD. Si no llega, fusionar.
+            // ============================================================
+            $totalChars = $documentData['char_count'] ?? strlen($documentData['text']);
+            $detectedUnits = count($outline['units']);
+            $maxUnits = max(1, floor($totalChars / 5000));
+            
+            if ($detectedUnits > 1 && $detectedUnits > $maxUnits) {
+                logError('DEBUG smart merge: doc=' . $totalChars . ' chars, detected=' . $detectedUnits . ' UDs, max=' . $maxUnits . ' -> merging');
                 
-                logError('DEBUG unit ' . $unit['numero'] . ': unitContent len=' . strlen($unitContent) . ', secciones=' . count($unit['secciones'] ?? []));
-                
-                // Generar preguntas con IA (si falla, continuar sin preguntas)
-                try {
-                    $questions = $aiProcessor->generateQuestions(
-                        $unit['titulo'],
-                        $unitContent,
-                        $unit['conceptos_clave'] ?? []
-                    );
-                    $unit['preguntas'] = $questions;
-                } catch (\Exception $qe) {
-                    logError('Error generando preguntas UD' . $unit['numero'] . ': ' . $qe->getMessage());
-                    $unit['preguntas'] = [];
+                // Si el doc es muy pequeño (<8000 chars), forzar 1 sola UD
+                if ($totalChars < 8000) {
+                    $maxUnits = 1;
                 }
                 
-                // Añadir código específico de esta unidad
-                $unit['codigo'] = $wordProcessor->extractCodeBlocksForContent($unitContent);
+                // Fusionar todas las UDs detectadas en $maxUnits UDs
+                $mergedUnits = [];
+                $chunkSize = max(1, ceil($detectedUnits / $maxUnits));
+                $chunks = array_chunk($outline['units'], $chunkSize);
                 
-                // Fase 2: Enriquecer secciones con IA (clasificación por componente visual)
-                if (!empty($unit['secciones']) && !empty($unitContent)) {
+                foreach ($chunks as $ci => $chunk) {
+                    $mergedContent = [];
+                    $mergedSections = [];
+                    $titles = [];
+                    
+                    foreach ($chunk as $u) {
+                        $titles[] = $u['title'];
+                        $mergedContent = array_merge($mergedContent, $u['content'] ?? []);
+                        $mergedSections = array_merge($mergedSections, $u['sections'] ?? []);
+                    }
+                    
+                    // Si solo hay 1 UD final, usar título inteligente (NO concatenar todos)
+                    if (count($chunks) === 1) {
+                        // Prioridad: module_title > structure title > nombre archivo limpio
+                        // NO usar $titles[0] porque suele ser "Introducción" u otro heading genérico
+                        $mergedTitle = $outline['module_title']
+                            ?: ($structure['title'] ?? '');
+                        
+                        // Si no hay título formal, usar nombre del archivo (limpio)
+                        if (empty($mergedTitle) || mb_strlen($mergedTitle) < 5) {
+                            $mergedTitle = pathinfo($file['name'], PATHINFO_FILENAME);
+                            $mergedTitle = str_replace(['_', '-'], ' ', $mergedTitle);
+                            // Capitalizar: "los ordenadores gaming" -> "Los ordenadores gaming"
+                            $mergedTitle = mb_strtoupper(mb_substr($mergedTitle, 0, 1)) . mb_substr($mergedTitle, 1);
+                        }
+                    } else {
+                        $mergedTitle = implode(' - ', $titles);
+                    }
+                    
+                    $mergedUnits[] = [
+                        'number' => $ci + 1,
+                        'title' => $mergedTitle,
+                        'sections' => $mergedSections,
+                        'content' => $mergedContent
+                    ];
+                }
+                
+                $outline['units'] = $mergedUnits;
+                logError('DEBUG smart merge: result=' . count($mergedUnits) . ' UDs');
+            }
+            
+            // Si no detectó unidades en el outline, usar PROMPT_ANALYZE clásico
+            if (empty($outline['units'])) {
+                logError('DEBUG: No outline units, falling back to full PROMPT_ANALYZE');
+                $analysisResult = $aiProcessor->analyzeDocument($documentData['text']);
+            } else {
+                // Construir resultado con estructura del Word + IA por unidad
+                $moduleTitle = $outline['module_title'] ?: $structure['title'] ?: 'Módulo formativo';
+                $moduleCode = 'MOD_01';
+                if (preg_match('/M[OÓ]DULO\s*(\w+)/iu', $documentData['text'], $mc)) {
+                    $moduleCode = 'MOD_' . strtoupper(trim($mc[1]));
+                }
+                
+                $units = [];
+                $totalHours = DEFAULT_HOURS;
+                $hoursPerUnit = max(1, floor($totalHours / count($outline['units'])));
+                
+                foreach ($outline['units'] as $ou) {
+                    $unitNumber = $ou['number'];
+                    $unitTitle = $ou['title'];
+                    
+                    // Reconstruir el texto completo de esta UD (secciones + subsecciones)
+                    $unitText = $wordProcessor->outlineToText(['module_title' => '', 'units' => [$ou]]);
+                    
+                    logError('DEBUG structureUnit UD' . $unitNumber . ': "' . mb_substr($unitTitle, 0, 40) . '" (' . strlen($unitText) . ' chars)');
+                    
+                    // Paso 2: IA estructura esta unidad
                     try {
-                        $enriched = $aiProcessor->enrichSections(
-                            $unit['titulo'],
-                            $unit['secciones'],
-                            $unitContent
+                        $structured = $aiProcessor->structureUnit($unitTitle, $unitText);
+                        
+                        $unitData = [
+                            'numero' => $unitNumber,
+                            'titulo' => $unitTitle,
+                            'duracion' => $hoursPerUnit,
+                            'resumen' => $structured['resumen'] ?? '',
+                            'objetivos' => $structured['objetivos'] ?? [],
+                            'secciones' => $structured['secciones'] ?? [],
+                            'conceptos_clave' => $structured['conceptos_clave'] ?? [],
+                            '_enriched' => true,
+                            '_structured' => true
+                        ];
+                    } catch (\Exception $suEx) {
+                        logError('Error structureUnit UD' . $unitNumber . ': ' . $suEx->getMessage());
+                        // Fallback: secciones básicas
+                        $unitContent = implode("\n\n", $ou['content'] ?? []);
+                        foreach ($ou['sections'] as $sec) {
+                            $unitContent .= "\n\n" . implode("\n\n", $sec['content'] ?? []);
+                            foreach ($sec['subsections'] as $sub) {
+                                $unitContent .= "\n\n" . implode("\n\n", $sub['content'] ?? []);
+                            }
+                        }
+                        $unitData = [
+                            'numero' => $unitNumber,
+                            'titulo' => $unitTitle,
+                            'duracion' => $hoursPerUnit,
+                            'resumen' => buildSmartSummary($unitContent, $unitTitle),
+                            'objetivos' => extractObjectives($unitContent, $unitTitle),
+                            'secciones' => buildSectionsFromContent($unitContent, $unitTitle),
+                            'conceptos_clave' => generateBasicFlashcards($unitTitle, $unitContent),
+                            'preguntas' => generateBasicQuestions($unitTitle)
+                        ];
+                    }
+                    
+                    // Paso 3: Generar preguntas
+                    if (!isset($unitData['preguntas'])) {
+                        try {
+                            $questions = $aiProcessor->generateQuestions(
+                                $unitTitle,
+                                $unitText,
+                                $unitData['conceptos_clave'] ?? []
+                            );
+                            $unitData['preguntas'] = $questions;
+                        } catch (\Exception $qe) {
+                            logError('Error preguntas UD' . $unitNumber . ': ' . $qe->getMessage());
+                            $unitData['preguntas'] = generateBasicQuestions($unitTitle);
+                        }
+                    }
+                    
+                    // Añadir bloques de código
+                    $unitData['codigo'] = $wordProcessor->extractCodeBlocksForContent($unitText);
+                    
+                    $units[] = $unitData;
+                }
+                
+                $analysisResult = [
+                    'modulo' => [
+                        'codigo' => $moduleCode,
+                        'titulo' => $moduleTitle,
+                        'duracion_total' => $totalHours
+                    ],
+                    'unidades' => $units
+                ];
+            }
+            
+            // Generar preguntas para las UDs que vengan del PROMPT_ANALYZE clásico
+            if ($analysisResult && empty($analysisResult['unidades'][0]['preguntas'] ?? null)) {
+                foreach ($analysisResult['unidades'] as &$unit) {
+                    if (!empty($unit['preguntas'])) continue;
+                    try {
+                        $ucontent = '';
+                        foreach ($unit['secciones'] ?? [] as $sec) {
+                            foreach ($sec['contenido_estructurado'] ?? [] as $b) {
+                                $ucontent .= ($b['texto'] ?? '') . "\n";
+                                $ucontent .= implode("\n", $b['items'] ?? []) . "\n";
+                            }
+                        }
+                        $unit['preguntas'] = $aiProcessor->generateQuestions(
+                            $unit['titulo'], $ucontent, $unit['conceptos_clave'] ?? []
                         );
-                        if (!empty($enriched['secciones'])) {
-                            $unit['secciones'] = $enriched['secciones'];
-                            $unit['_enriched'] = true; // Flag para el generador
-                        }
-                        if (!empty($enriched['conclusiones'])) {
-                            $unit['conclusiones_ia'] = $enriched['conclusiones'];
-                        }
-                        logError('DEBUG enrichSections UD' . $unit['numero'] . ': OK, ' . count($enriched['secciones'] ?? []) . ' secciones enriquecidas');
-                    } catch (\Exception $enrichEx) {
-                        logError('Error enrichSections UD' . $unit['numero'] . ': ' . $enrichEx->getMessage() . ' - Fallback a distribución básica');
-                        // Fallback: distribución básica sin clasificación IA
-                        $unit['secciones'] = enrichSectionsWithRealContent($unit['secciones'], $unitContent);
+                    } catch (\Exception $qe) {
+                        $unit['preguntas'] = generateBasicQuestions($unit['titulo']);
                     }
                 }
             }

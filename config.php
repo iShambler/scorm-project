@@ -33,7 +33,7 @@ if (file_exists($envFile)) {
 
 define('CLAUDE_API_KEY', $_ENV['CLAUDE_API_KEY'] ?? 'tu-api-key-aqui');
 define('CLAUDE_MODEL', 'claude-sonnet-4-20250514');
-define('CLAUDE_MAX_TOKENS', 4096);
+define('CLAUDE_MAX_TOKENS', 16000);
 
 // =============================================
 // CONFIGURACIÓN DE RUTAS
@@ -74,96 +74,244 @@ define('COLOR_SUCCESS', '#22c55e');
 // PROMPTS PARA LA IA
 // =============================================
 define('PROMPT_ANALYZE', <<<'PROMPT'
-Eres un experto en diseño instruccional y creación de contenidos formativos. Analiza el siguiente contenido de un documento Word y extrae la información estructurada.
+Eres un experto en diseño instruccional y creación de contenidos formativos para e-learning. Tu tarea es analizar un documento Word y crear la ESTRUCTURA COMPLETA del curso con todo el contenido asignado.
 
 CONTENIDO DEL DOCUMENTO:
 {content}
 
-Responde ÚNICAMENTE con un JSON válido (sin markdown, sin explicaciones) con esta estructura exacta:
+Responde ÚNICAMENTE con un JSON válido (sin markdown, sin explicaciones) con esta estructura:
 {
     "modulo": {
-        "codigo": "código detectado o sugerido (ej: MOD_01, PROY_M4)",
+        "codigo": "código detectado o sugerido (ej: MOD_01, MOD_02)",
         "titulo": "título del módulo",
         "duracion_total": número de horas totales
     },
     "unidades": [
         {
             "numero": 1,
-            "titulo": "título de la unidad (solo primera letra mayúscula)",
-            "duracion": horas de la unidad,
-            "resumen": "resumen breve de 2-3 líneas",
-            "objetivos": ["objetivo 1", "objetivo 2", "objetivo 3"],
-            "conceptos_clave": [
-                {"termino": "término", "definicion": "definición clara y concisa"}
-            ],
+            "titulo": "título de la unidad",
+            "duracion": horas estimadas,
+            "resumen": "resumen de 2-3 líneas para la portada",
+            "objetivos": ["objetivo 1", "objetivo 2", "objetivo 3", "objetivo 4"],
             "secciones": [
-                {"titulo": "título de la sección temática", "contenido": ""}
+                {
+                    "titulo": "título de la sección",
+                    "contenido_estructurado": [
+                        {"tipo": "parrafo", "texto": "texto del párrafo"},
+                        {"tipo": "definicion", "termino": "término", "texto": "definición"},
+                        {"tipo": "lista", "titulo": "título opcional de la lista", "items": ["item 1 completo", "item 2 completo"]},
+                        {"tipo": "tabla", "filas": [["Col1","Col2"],["dato1","dato2"]]},
+                        {"tipo": "importante", "texto": "texto destacado"},
+                        {"tipo": "ejemplo", "texto": "caso práctico"}
+                    ]
+                }
+            ],
+            "conceptos_clave": [
+                {"termino": "término", "definicion": "definición concisa"}
             ]
         }
     ]
 }
 
-REGLAS IMPORTANTES:
-- Los títulos deben seguir las normas de la RAE: solo primera letra en mayúscula (excepto nombres propios)
-- Detecta TODAS las unidades didácticas del documento
-- Genera entre 4-8 conceptos clave (flashcards) por unidad basados en el contenido real
-- Los conceptos deben ser relevantes y las definiciones claras
-- Si no detectas estructura clara, organiza el contenido de forma lógica
-- En "secciones" genera SOLO los títulos temáticos (3-5 por unidad), deja "contenido" vacío (se rellenará después con el texto real del documento)
-- Los títulos de secciones deben reflejar los temas principales de cada unidad
+TIPOS DE BLOQUE para "contenido_estructurado":
+- "parrafo": texto explicativo (máx 4 frases)
+- "definicion": término + definición (campos "termino" y "texto")
+- "lista": enumeración (campo "items" con texto COMPLETO de cada punto)
+- "tabla": datos tabulares (campo "filas", primera fila = cabecera)
+- "importante": advertencia o punto crítico
+- "sabias_que": dato complementario o curioso
+- "ejemplo": caso práctico o ilustrativo
+- "comparativa": 2-4 elementos a contrastar (campo "items" con formato "Nombre: descripción")
+
+REGLAS CRÍTICAS:
+
+1. ESTRUCTURA: 
+   - Si el documento tiene estructura clara (temas, capítulos, secciones numeradas), RESPÉTALA. Cada tema/capítulo = una unidad, cada sección numerada = una sección.
+   - Si el documento NO tiene estructura clara, CREA una organización lógica dividiendo el contenido en 3-5 secciones por unidad.
+   - Las subsecciones del documento (ej: 4.3.a, 4.3.b) se convierten en secciones independientes del SCORM.
+
+2. CONTENIDO COMPLETO:
+   - TODA la información del documento debe estar en "contenido_estructurado". No pierdas NADA.
+   - Cada párrafo, lista, definición, dato del Word debe aparecer como un bloque.
+   - Los items de las listas deben contener el TEXTO COMPLETO del bullet original, no resumen.
+   - Cuando haya varias listas con distinto contexto, crea bloques separados (cada uno con su párrafo introductorio).
+
+3. FIDELIDAD:
+   - Mantén el texto original. NO resumas, NO sintetices, NO reescribas. Tu trabajo es ORGANIZAR y elegir el tipo de bloque adecuado.
+   - Si el documento dice "La disminución del Índice de Barthel en 20 puntos (salvo cuando el Barthel sea menor de 60 puntos)", eso aparece íntegro.
+
+4. TABLAS:
+   - Cuando el texto menciona escalas con puntuaciones, clasificaciones o rangos, SIEMPRE usar tipo "tabla".
+   - Las tablas que ya existen en el documento se preservan como tipo "tabla".
+
+5. FORMATO:
+   - Títulos: primera letra mayúscula, resto minúscula (excepto nombres propios y siglas)
+   - 4-8 conceptos_clave por unidad basados en el contenido real
+   - 3-5 objetivos por unidad
+   - Párrafos de máximo 4 frases. Si hay un párrafo largo, divídelo en varios bloques.
 PROMPT
 );
 
-define('PROMPT_ENRICH_SECTIONS', <<<'PROMPT'
-Eres un experto en diseño instruccional para e-learning. Tu tarea es enriquecer las secciones de una unidad didáctica clasificando cada bloque de contenido por tipo de componente visual.
+// Prompt para estructurar UNA unidad con todo su contenido
+// Se llama por cada UD detectada, pasándole solo el texto de esa UD
+// ENFOQUE: Diseñador instruccional e-learning con reglas claras de fidelidad
+define('PROMPT_STRUCTURE_UNIT', <<<'PROMPT'
+Eres un DISEÑADOR INSTRUCCIONAL EXPERTO en e-learning. Tu trabajo es ORGANIZAR contenido existente en una EXPERIENCIA DE APRENDIZAJE INTERACTIVA para SCORM, eligiendo el mejor componente visual para cada fragmento.
 
 UNIDAD: {unit_title}
-SECCIONES (títulos propuestos por análisis previo): {section_titles}
 
-CONTENIDO REAL DEL DOCUMENTO (texto extraído del Word):
+CONTENIDO DE LA UNIDAD:
 {unit_content}
 
-Distribuye el contenido real entre las secciones y clasifica CADA bloque según su naturaleza. Responde ÚNICAMENTE con un JSON válido:
+Responde ÚNICAMENTE con un JSON válido (sin markdown, sin ```json, sin explicaciones).
+IMPORTANTE para JSON válido: escapa comillas dobles dentro del texto como \" y no uses caracteres de control.
+
+{
+    "secciones": [
+        {
+            "titulo": "título atractivo de la sección",
+            "icono_keyword": "keyword EN INGLÉS para imagen (ej: gaming computer, processor chip, cooling fan)",
+            "contenido_estructurado": [
+                {"tipo": "parrafo", "texto": "texto introductorio"},
+                {"tipo": "definicion", "termino": "CPU", "texto": "El procesador central..."},
+                {"tipo": "lista", "titulo": "título opcional", "items": ["item completo 1", "item completo 2"]},
+                {"tipo": "tabla", "filas": [["Col1","Col2"],["dato1","dato2"]]},
+                {"tipo": "comparativa", "items": ["Opción A: descripción", "Opción B: descripción"]},
+                {"tipo": "proceso", "items": ["Paso 1. Explicación detallada", "Paso 2. Explicación"]},
+                {"tipo": "importante", "texto": "advertencia extraída del contenido"},
+                {"tipo": "sabias_que", "texto": "dato curioso BASADO en el contenido"},
+                {"tipo": "ejemplo", "texto": "caso práctico del contenido"}
+            ]
+        }
+    ],
+    "resumen": "resumen de 2-3 líneas para la portada",
+    "objetivos": ["Al finalizar serás capaz de...", "Comprenderás...", "Podrás aplicar..."],
+    "conceptos_clave": [
+        {"termino": "término", "definicion": "definición concisa (max 120 chars)"}
+    ]
+}
+
+COMPONENTES DISPONIBLES (usa variedad, nunca más de 2 párrafos seguidos):
+- "parrafo": texto breve, máx 3-4 frases. Para introducciones y transiciones
+- "definicion": término + explicación en caja destacada azul
+- "lista": bullets visuales. Items = texto COMPLETO del original
+- "tabla": datos comparativos. Campo "filas", primera fila = cabecera
+- "comparativa": 2-4 elementos en TABS interactivas ("items" formato "Nombre: descripción")
+- "proceso": pasos en ACORDEÓN desplegable. SOLO para procedimientos REALES paso a paso (ej: montar un PC, instalar software). NUNCA para listar conceptos o componentes.
+- "importante": caja amarilla de advertencia
+- "sabias_que": caja verde de dato complementario
+- "ejemplo": caja con caso práctico
+
+REGLAS DE FIDELIDAD (prioridad máxima):
+
+1. TODO EL CONTENIDO DEL DOCUMENTO DEBE APARECER. No pierdas ni una frase, dato o cifra.
+2. NO INVENTES información nueva. Solo reorganiza y presenta lo que ya existe.
+3. Los "sabias_que" y "ejemplo" SOLO pueden contener información que ESTÁ en el documento.
+   - Si el documento menciona un dato curioso → conviértelo en "sabias_que"
+   - Si el documento tiene un caso práctico → conviértelo en "ejemplo"
+   - Si NO hay datos curiosos ni ejemplos en el documento → NO los añadas
+4. Al dividir párrafos largos: corta por oraciones completas, sin cambiar el orden ni mezclar párrafos distintos.
+5. Items de listas = texto ÍNTEGRO del bullet original del Word.
+
+REGLAS DE AGRUPACIÓN (clave para buen diseño):
+
+Cuando el contenido presenta 3 o más elementos del MISMO tipo seguidos, SIEMPRE agrúpalos en UN SOLO componente:
+
+- 3+ conceptos con nombre y descripción → UNA "tabla" con columnas [Nombre, Descripción]
+- 3+ ventajas o características → UNA "lista" (no 3 párrafos separados)
+- 2-4 opciones contrastadas → UNA "comparativa" (tabs)
+- 3+ pasos de un PROCEDIMIENTO REAL (instrucciones que se siguen en orden) → UN "proceso" (acordeón)
+
+NUNCA hagas esto:
+- 3 "definicion" seguidas + 2 items en "lista" para el mismo grupo de conceptos (inconsistente)
+- Separar elementos homólogos en tipos de bloque distintos
+- Usar "proceso" para listar conceptos, componentes o características. "Proceso" es SOLO para procedimientos paso a paso (ej: "Paso 1: Instalar drivers, Paso 2: Configurar BIOS")
+
+Regla simple: si puedes decir "estos N items son del mismo tipo/categoría", van en UN SOLO bloque.
+
+CRITERIO PARA ELEGIR COMPONENTE al agrupar:
+- Si cada elemento tiene nombre + descripción (cualquier longitud) → "tabla" [Nombre, Descripción]. La tabla es el DEFAULT para agrupar conceptos.
+- Si cada descripción es MUY larga (5+ frases / párrafo completo) → "comparativa" (tabs) si son 2-4 items, o dividir en subsecciones si son más
+- Si son solo nombres/frases sin estructura → "lista"
+- Si son instrucciones secuenciales reales → "proceso" (acordeón)
+
+REGLAS DE DISEÑO:
+
+1. VARIEDAD VISUAL: Alterna tipos de bloque. Nunca más de 2 "parrafo" seguidos.
+   Patrón ideal: parrafo → tabla → sabias_que → lista → parrafo...
+
+2. COMPONENTES INTERACTIVOS: Usa estos siempre que el contenido lo permita:
+   - Dos cosas que comparar → "comparativa" (genera tabs clicables)
+   - Procedimiento real con pasos ordenados → "proceso" (genera acordeón)
+   - Grupo de conceptos con nombre + descripción → "tabla" (muy visual y compacta, es el DEFAULT)
+
+3. MÁX 2 "definicion" por sección. Si hay 3+, usa tabla o acordeón.
+
+4. ESTRUCTURA:
+   - 3-6 secciones por unidad, cada una con 4-8 bloques
+   - Empieza cada sección con un párrafo introductorio
+   - Títulos de sección descriptivos y atractivos
+   - icono_keyword específico ("gaming desktop rgb" mejor que "technology")
+
+5. CONCEPTOS CLAVE (generan flashcards y juego de matching):
+   - 5-8 términos REALES extraídos del contenido
+   - Definiciones de máx 120 caracteres
+
+EJEMPLO BUEN DISEÑO:
+  Componentes de PC: parrafo(intro) → tabla([Componente, Función]: CPU/GPU/RAM/SSD/Placa) → sabias_que → importante
+  Ventajas gaming: parrafo(intro) → tabla([Ventaja, Detalle]: Personalización/Rendimiento/Biblioteca/Periféricos)
+  Montar un PC: parrafo(intro) → proceso([Instalar CPU, Montar RAM, Conectar GPU...]) ← ESTO sí es proceso (pasos reales)
+
+EJEMPLO MAL DISEÑO (evitar):
+  proceso([CPU: es el cerebro, GPU: procesa gráficos, RAM: memoria]) = NO son pasos, son conceptos → usar tabla
+  definicion(CPU) → definicion(GPU) → definicion(RAM) → lista([SSD, Placa]) = inconsistente
+  parrafo, parrafo, parrafo, parrafo = documento de texto, no e-learning
+PROMPT
+);
+
+// Prompt alternativo para enriquecer secciones (mismo esquema JSON que PROMPT_STRUCTURE_UNIT)
+define('PROMPT_ENRICH_SECTIONS', <<<'PROMPT'
+Eres un experto en diseño instruccional para e-learning. TRANSFORMA el contenido de un documento Word en bloques didácticos interactivos.
+
+UNIDAD: {unit_title}
+SECCIONES (títulos propuestos): {section_titles}
+
+CONTENIDO DEL DOCUMENTO:
+{unit_content}
+
+Responde ÚNICAMENTE con JSON válido (sin markdown, sin ```json). Escapa comillas dobles como \".
+
 {
     "secciones": [
         {
             "titulo": "título de la sección",
-            "icono_keyword": "una palabra clave EN INGLÉS que describa el tema de esta sección para buscar un icono (ej: climate, database, security, leaf, chart, team, innovation, law, chemistry, network)",
-            "bloques": [
-                {
-                    "tipo": "parrafo|definicion|lista|comparativa|proceso|tip_importante|tip_saber|tip_practica|ejemplo|codigo",
-                    "contenido": "texto del bloque",
-                    "termino": "solo para tipo definicion: el término que se define",
-                    "items": ["solo para tipo lista/comparativa/proceso: array de items"],
-                    "etiqueta": "solo para tips: Importante/Recuerda/Sabías que/Práctica/Ejemplo"
-                }
+            "icono_keyword": "keyword EN INGLÉS para imagen",
+            "contenido_estructurado": [
+                {"tipo": "parrafo", "texto": "texto del bloque"},
+                {"tipo": "definicion", "termino": "término", "texto": "definición"},
+                {"tipo": "lista", "titulo": "título opcional", "items": ["item 1", "item 2"]},
+                {"tipo": "tabla", "filas": [["Col1","Col2"],["dato1","dato2"]]},
+                {"tipo": "comparativa", "items": ["A: desc", "B: desc"]},
+                {"tipo": "proceso", "items": ["Paso 1. Detalle", "Paso 2. Detalle"]},
+                {"tipo": "importante", "texto": "advertencia"},
+                {"tipo": "sabias_que", "texto": "dato curioso del contenido"},
+                {"tipo": "ejemplo", "texto": "caso práctico del contenido"}
             ]
         }
     ],
-    "conclusiones": ["frase resumen 1", "frase resumen 2", "frase resumen 3"]
+    "conclusiones": ["Has aprendido a...", "Ahora puedes..."]
 }
 
-TIPOS DE COMPONENTE (elige el más adecuado para cada fragmento):
-- "parrafo": texto explicativo normal
-- "definicion": un concepto y su definición (incluir campo "termino")
-- "lista": enumeración de elementos (incluir campo "items")
-- "comparativa": comparación entre 2+ elementos, se mostrará como pestañas/tabs (incluir "items" con formato "Nombre: descripción")
-- "proceso": pasos secuenciales, se mostrará como acordeón (incluir "items" con cada paso)
-- "tip_importante": advertencia o punto crítico (incluir "etiqueta": "Importante")
-- "tip_saber": dato curioso o complementario (incluir "etiqueta": "Sabías que")
-- "tip_practica": ejercicio o caso práctico (incluir "etiqueta": "Práctica")
-- "ejemplo": ejemplo ilustrativo (incluir "etiqueta": "Ejemplo")
-- "codigo": fragmento de código fuente
-
 REGLAS:
-- Usa el contenido REAL del documento, no inventes texto
-- Cada sección debe tener entre 3-8 bloques
-- Varía los tipos de componente para mantener el interés visual
-- Si una sección no tiene contenido claro, redistribuye el contenido disponible
-- Las conclusiones deben ser 3-5 frases que resuman lo aprendido en la unidad
-- Prioriza: al menos 1 definicion, 1 lista y 1 tip por sección cuando el contenido lo permita
-- Los bloques tipo "comparativa" deben tener exactamente 2-4 items
-- Los bloques tipo "proceso" deben tener 3-6 pasos
+1. FIDELIDAD: Mantén TODO el texto original. NO resumas, NO inventes. Elige el mejor componente visual para cada fragmento.
+2. Items de listas = TEXTO COMPLETO del bullet original.
+3. Al dividir párrafos: corta por oraciones completas, sin mezclar párrafos distintos.
+4. "sabias_que" y "ejemplo" SOLO con información que YA está en el documento.
+5. Variedad visual: nunca más de 2 "parrafo" seguidos. Alterna componentes.
+6. Tablas para escalas, clasificaciones, datos numéricos comparativos.
+7. "comparativa" para 2-4 elementos contrastados explícitamente.
+8. "proceso" SOLO para procedimientos con 3+ pasos largos (no listas simples).
+9. Conclusiones: 3-5 frases como logros del alumno.
 PROMPT
 );
 

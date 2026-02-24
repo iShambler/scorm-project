@@ -99,8 +99,26 @@ PROMPT;
     }
     
     /**
+     * Estructura una unidad completa: la IA organiza el contenido en secciones y bloques
+     * Este es el paso central del nuevo flujo: recibe texto crudo de una UD y devuelve
+     * la estructura completa con contenido_estructurado
+     */
+    public function structureUnit(string $unitTitle, string $unitContent): array
+    {
+        $prompt = PROMPT_STRUCTURE_UNIT;
+        $prompt = str_replace('{unit_title}', $unitTitle, $prompt);
+        $prompt = str_replace('{unit_content}', $this->truncateContent($unitContent, 25000), $prompt);
+        
+        $response = $this->callAPI($prompt);
+        $data = $this->parseJsonResponse($response);
+        
+        return $data;
+    }
+
+    /**
      * Enriquece secciones clasificando cada bloque por tipo de componente visual
      * Fase 2: la IA decide qué componente usar para cada fragmento de contenido
+     * @deprecated Usar structureUnit() en su lugar
      */
     public function enrichSections(string $unitTitle, array $secciones, string $unitContent): array
     {
@@ -109,7 +127,7 @@ PROMPT;
         $prompt = PROMPT_ENRICH_SECTIONS;
         $prompt = str_replace('{unit_title}', $unitTitle, $prompt);
         $prompt = str_replace('{section_titles}', $sectionTitles, $prompt);
-        $prompt = str_replace('{unit_content}', $this->truncateContent($unitContent, 10000), $prompt);
+        $prompt = str_replace('{unit_content}', $this->truncateContent($unitContent, 20000), $prompt);
         
         $response = $this->callAPI($prompt);
         $data = $this->parseJsonResponse($response);
@@ -169,7 +187,7 @@ PROMPT;
                 'anthropic-version: 2023-06-01'
             ],
             CURLOPT_POSTFIELDS => json_encode($data),
-            CURLOPT_TIMEOUT => 120,
+            CURLOPT_TIMEOUT => 300,
             CURLOPT_SSL_VERIFYPEER => true
         ]);
         
