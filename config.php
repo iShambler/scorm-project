@@ -125,10 +125,13 @@ TIPOS DE BLOQUE para "contenido_estructurado":
 
 REGLAS CRÍTICAS:
 
-1. ESTRUCTURA: 
-   - Si el documento tiene estructura clara (temas, capítulos, secciones numeradas), RESPÉTALA. Cada tema/capítulo = una unidad, cada sección numerada = una sección.
+1. ESTRUCTURA:
+   - REGLA DE TAMAÑO: Cada unidad debe tener contenido SUSTANCIAL (mínimo ~1500 palabras o 3+ páginas). Si el documento entero es corto (menos de 5000 palabras / ~10 páginas), haz UNA SOLA UNIDAD con varias secciones.
+   - Si el documento tiene capítulos/temas GRANDES (cada uno con 3+ páginas), cada capítulo = una unidad.
+   - Si el documento tiene secciones numeradas PEQUEÑAS (1.1, 1.2, 1.3... cada una con pocos párrafos), esas secciones NO son unidades. Son SECCIONES dentro de una misma unidad.
+   - Las subsecciones del documento (ej: 4.3.a, 4.3.b) se convierten en secciones dentro de la unidad correspondiente.
    - Si el documento NO tiene estructura clara, CREA una organización lógica dividiendo el contenido en 3-5 secciones por unidad.
-   - Las subsecciones del documento (ej: 4.3.a, 4.3.b) se convierten en secciones independientes del SCORM.
+   - NUNCA crees unidades con menos de 2 secciones o con muy poco contenido. Es mejor tener 1-2 unidades ricas que 6 unidades vacías.
 
 2. CONTENIDO COMPLETO:
    - TODA la información del documento debe estar en "contenido_estructurado". No pierdas NADA.

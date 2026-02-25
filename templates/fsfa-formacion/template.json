@@ -1,0 +1,33 @@
+{
+  "id": "fsfa-formacion",
+  "name": "FSFA Formación",
+  "description": "Plantilla corporativa de la Fundación Social para la Formación en Andalucía. Verde institucional oscuro #003a0e con blanco, diseño limpio y profesional.",
+  "author": "FSFA / ARELANCE",
+  "version": "1.0",
+  "colors": {
+    "primary": "#003a0e",
+    "secondary": "#00551a",
+    "accent": "#2e7d32",
+    "bg": "#f4f7f4",
+    "card": "#ffffff",
+    "text": "#1a1a1a",
+    "text_light": "#4a4a4a",
+    "border": "#c8d8c8",
+    "success": "#2e7d32",
+    "danger": "#c62828",
+    "warning": "#ef6c00"
+  },
+  "fonts": {
+    "heading": "Poppins",
+    "body": "Inter",
+    "code": "Fira Code"
+  },
+  "settings": {
+    "radius": "10px",
+    "portada_style": "gradient",
+    "sidebar_style": "gradient",
+    "google_fonts_url": "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap"
+  },
+  "logo": "assets/logo_movil.jpg",
+  "portada_bg": ""
+}

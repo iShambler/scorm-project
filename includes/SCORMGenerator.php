@@ -23,12 +23,15 @@ class SCORMGenerator
     private array $images;
     private string $templateId;
 
+    private array $templateData;
+
     public function __construct(array $moduleConfig, array $units, array $images = [], string $templateId = 'arelance-corporate')
     {
         $this->moduleConfig = $moduleConfig;
         $this->units = $units;
         $this->images = $images;
         $this->templateId = $templateId;
+        $this->templateData = [];
         $this->tempPath = TEMP_PATH . '/' . generateUniqueId();
         foreach (['', '/css', '/js', '/scos', '/img'] as $d) {
             @mkdir($this->tempPath . $d, 0755, true);
@@ -126,19 +129,6 @@ class SCORMGenerator
             $objHtml .= '</ul>';
         }
 
-        // Episodes (index cards)
-        $epsHtml = '';
-        if (!empty($unit['secciones'])) {
-            $epsHtml = '<section class="episodes">';
-            foreach ($unit['secciones'] as $si => $sec) {
-                $n = str_pad($si + 1, 2, '0', STR_PAD_LEFT);
-                $sid = 'step-' . $udN . '-' . chr(97 + $si);
-                $epsHtml .= '<article class="episode"><h2 class="episode__number">' . $n . '</h2>'
-                    . '<div class="episode__detail setup-panel"><a href="#' . $sid . '" class="episode__title tema"><h4>' . $this->e($sec['titulo']) . '</h4></a></div></article>';
-            }
-            $epsHtml .= '</section>';
-        }
-
         // Resumen
         $resHtml = !empty($unit['resumen']) ? '<p class="site__intro">' . $this->e($unit['resumen']) . '</p>' : '';
 
@@ -158,7 +148,7 @@ class SCORMGenerator
 <!-- PORTADA -->
 <div class="content content--intro">
   <div class="content__inner">
-    <div class="corpo"><span class="corpo-logo">' . $emp . '</span><p>Aula digital de formaci&oacute;n</p></div>
+    <div class="corpo">' . $this->getLogoHTML() . '<span class="corpo-logo">' . $emp . '</span><p>Aula digital de formaci&oacute;n</p></div>
     <div class="portada-center">
       <p class="portada__modulo">' . $cod . '</p>
       <span class="portada__badge">Unidad ' . $udN . '</span>
@@ -183,20 +173,21 @@ class SCORMGenerator
 <!-- NAV -->
 <nav class="topnav">
   <a href="#" class="abre menuicono">&#9776;</a>
+  ' . $this->getLogoHTML('../', 'topnav-logo-img') . '
   <span class="topnav-title">Ud.&nbsp;' . $udN . '</span>
   <div class="topnav-units">' . $this->buildUnitNav($idx) . '</div>
   <span class="topnav-empresa">' . $emp . '</span>
 </nav>
 
-<!-- HOME -->
+<!-- HOME: Vista 1 — Presentación + Objetivos -->
 <div class="home">
   <div class="main">
     <section class="site">
       <h1 class="site__title">Unidad ' . $udN . ':<br>' . $udT . '</h1>
       <div class="site__separator"></div>
       ' . $resHtml . $objHtml . '
+      <div class="home-nav"><a href="#" class="btn-action tema" style="margin-top:1.5rem;display:inline-block;padding:.85rem 2.5rem;border-radius:50px;font-size:1rem">Ver contenido &rarr;</a></div>
     </section>
-    ' . $epsHtml . '
   </div>
   <footer class="main-footer"><p>&copy; ' . date('Y') . ' ' . $emp . '</p></footer>
 </div>
@@ -225,21 +216,24 @@ class SCORMGenerator
         $udN = $unit['numero'];
         $steps = [];
 
-        // --- INDICE ---
-        $lix = '';
+        // --- INDICE (Vista 2: episodes clicables) ---
+        $epsIdx = '';
         if (!empty($unit['secciones'])) {
-            $lix = '<ul class="lista_indice">';
-            foreach ($unit['secciones'] as $s) $lix .= '<li>' . $this->e($s['titulo']) . '</li>';
-            $lix .= '</ul>';
+            $epsIdx = '<section class="episodes">';
+            foreach ($unit['secciones'] as $si => $sec) {
+                $n = str_pad($si + 1, 2, '0', STR_PAD_LEFT);
+                $sid = 'step-' . $udN . '-' . chr(97 + $si);
+                $epsIdx .= '<article class="episode"><h2 class="episode__number">' . $n . '</h2>'
+                    . '<div class="episode__detail setup-panel"><a href="#' . $sid . '" class="episode__title tema"><h4>' . $this->e($sec['titulo']) . '</h4></a></div></article>';
+            }
+            $epsIdx .= '</section>';
         }
         $steps[] = [
             'id' => 'step-index', 'label' => 'Ud. ' . $udN . ': ' . $unit['titulo'],
             'epi' => false, 'hide' => false,
             'html' => $this->wrapStep('step-index', false, true,
-                '<h3>&Iacute;ndice</h3>'
-                . '<div class="card-box intro"><h2 class="titulounidad"><span class="text-accent">'
-                . str_pad($udN, 2, '0', STR_PAD_LEFT) . '</span> ' . $this->e($unit['titulo']) . '</h2>'
-                . $lix . '<p class="duracion-badge">&#9201; ' . ($unit['duracion'] ?? '') . ' horas</p></div>')
+                '<h3>&Iacute;ndice de contenidos</h3>'
+                . $epsIdx)
         ];
 
         // --- SECCIONES ---
@@ -864,7 +858,13 @@ JSEND;
         try {
             $css = $tm->buildCSS($this->templateId);
             // Copiar assets de la plantilla (logo, fondos, fuentes)
-            $tm->copyAssets($this->templateId, $this->tempPath);
+            $copiedAssets = $tm->copyAssets($this->templateId, $this->tempPath);
+            // Cargar datos del template para uso en HTML (logo, etc.)
+            $tplData = $tm->loadTemplate($this->templateId);
+            if ($tplData) {
+                $this->templateData = $tplData;
+                $this->templateData['_copied_assets'] = $copiedAssets;
+            }
         } catch (\Exception $e) {
             // Fallback: CSS mínimo si falla la plantilla
             $css = $this->getFallbackCSS();
@@ -910,6 +910,7 @@ img{max-width:100%}.d-none{display:none!important}
 .content--intro{position:fixed;inset:0;z-index:500;background:linear-gradient(135deg,var(--primary) 0%,var(--secondary) 50%,var(--accent) 100%);display:flex;align-items:center;justify-content:center}
 .content__inner{text-align:center;color:#fff;padding:2rem}
 .corpo{background:rgba(255,255,255,.12);backdrop-filter:blur(10px);border-radius:var(--radius);padding:1rem 2.5rem;margin-bottom:3rem;display:flex;align-items:center;gap:1.5rem;justify-content:center;flex-wrap:wrap}
+.corpo-logo-img{height:48px;width:auto;object-fit:contain;border-radius:6px}
 .corpo-logo{font-family:'Poppins',sans-serif;font-size:1.3rem;font-weight:700;letter-spacing:1px}
 .corpo p{font-size:1rem;font-weight:300;margin:0;opacity:.9}
 .portada-center{max-width:700px}
@@ -933,6 +934,7 @@ img{max-width:100%}.d-none{display:none!important}
 .topnav{position:fixed;top:0;left:0;right:0;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.08);display:flex;align-items:center;z-index:100;height:50px;padding:0 1rem;gap:.5rem}
 .menuicono{font-size:1.4rem;color:var(--primary);text-decoration:none;padding:.5rem}
 .topnav-title{font-weight:600;color:var(--primary);font-size:.95rem;white-space:nowrap}
+.topnav-logo-img{height:30px;width:auto;object-fit:contain;margin-right:.25rem}
 .topnav-units{display:flex;align-items:center;gap:4px;flex:1;justify-content:center;overflow-x:auto}
 .topnav-ud{display:inline-flex;align-items:center;justify-content:center;padding:.25rem .7rem;border-radius:20px;font-size:.78rem;font-weight:600;color:var(--text-light);background:var(--bg);text-decoration:none;transition:all .2s;white-space:nowrap;border:1.5px solid transparent}
 .topnav-ud:hover{color:var(--primary);background:#e8edf2;text-decoration:none}
@@ -1176,6 +1178,20 @@ CSSEND;
     private function e(string $text): string
     {
         return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    }
+
+    /**
+     * Genera el HTML del logo corporativo si la plantilla tiene uno configurado
+     * @param string $basePath Prefijo para rutas relativas (ej: '../' desde scos/)
+     * @return string HTML de la imagen del logo, o cadena vacía si no hay logo
+     */
+    private function getLogoHTML(string $basePath = '../', string $cssClass = 'corpo-logo-img'): string
+    {
+        $logoPath = $this->templateData['_copied_assets']['logo'] ?? '';
+        if (empty($logoPath)) return '';
+        $src = $basePath . $this->e($logoPath);
+        $alt = $this->e($this->templateData['name'] ?? 'Logo');
+        return '<img src="' . $src . '" alt="' . $alt . '" class="' . $cssClass . '">';
     }
 
     /**

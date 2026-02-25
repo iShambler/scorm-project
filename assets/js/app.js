@@ -91,6 +91,16 @@ async function analyzeDocument() {
         document.getElementById('cfg-code').value = analysisData.modulo.codigo || 'MOD_01';
         document.getElementById('cfg-title').value = analysisData.modulo.titulo || '';
         document.getElementById('cfg-hours').value = analysisData.modulo.duracion_total || 50;
+        // Sync cfg-hours changes to unit durations
+        document.getElementById('cfg-hours').addEventListener('change', function() {
+            const total = parseInt(this.value) || 50;
+            const numUnits = analysisData.unidades.length;
+            const perUnit = Math.max(1, Math.round(total / numUnits));
+            analysisData.unidades.forEach((u, i) => { u.duracion = perUnit; });
+            analysisData.modulo.duracion_total = total;
+            renderUnitsList();
+            renderSummaryStats();
+        });
         renderUnitsList();
         renderSummaryStats();
         updateProgress(100);
@@ -110,7 +120,7 @@ function renderUnitsList() {
             + '<div class="unit-num">UD' + u.numero + '</div>'
             + '<div class="unit-title"><input type="text" class="unit-title-input" data-unit-idx="' + i + '" value="' + esc(u.titulo).replace(/"/g, '&quot;') + '" /></div>'
             + '<div class="unit-stats"><span class="unit-stat">' + s + ' secc.</span><span class="unit-stat">' + fc + ' flash.</span><span class="unit-stat">' + q + ' preg.</span></div>'
-            + '<div class="unit-hours">' + u.duracion + 'h</div>'
+            + '<div class="unit-hours"><input type="number" class="unit-hours-input" data-unit-idx="' + i + '" value="' + (u.duracion || 6) + '" min="1" max="200" step="1" />h</div>'
             + '</div>';
     });
     c.innerHTML = h;
@@ -119,6 +129,17 @@ function renderUnitsList() {
         inp.addEventListener('change', e => {
             const idx = parseInt(e.target.dataset.unitIdx);
             analysisData.unidades[idx].titulo = e.target.value;
+        });
+    });
+    c.querySelectorAll('.unit-hours-input').forEach(inp => {
+        inp.addEventListener('change', e => {
+            const idx = parseInt(e.target.dataset.unitIdx);
+            analysisData.unidades[idx].duracion = parseFloat(e.target.value) || 6;
+            // Recalcular total
+            let total = 0;
+            analysisData.unidades.forEach(u => total += (u.duracion || 0));
+            document.getElementById('cfg-hours').value = total;
+            renderSummaryStats();
         });
     });
 }
@@ -224,6 +245,19 @@ async function generateSCORM() {
     analysisData.modulo.titulo = document.getElementById('cfg-title').value;
     analysisData.modulo.duracion_total = parseInt(document.getElementById('cfg-hours').value) || 50;
     analysisData.modulo.empresa = document.getElementById('cfg-company').value;
+    // Sync edited unit hours/titles from inputs
+    document.querySelectorAll('.unit-hours-input').forEach(inp => {
+        const idx = parseInt(inp.dataset.unitIdx);
+        if (!isNaN(idx) && analysisData.unidades[idx]) {
+            analysisData.unidades[idx].duracion = parseFloat(inp.value) || 6;
+        }
+    });
+    document.querySelectorAll('.unit-title-input').forEach(inp => {
+        const idx = parseInt(inp.dataset.unitIdx);
+        if (!isNaN(idx) && analysisData.unidades[idx]) {
+            analysisData.unidades[idx].titulo = inp.value;
+        }
+    });
     analysisData.template_id = selectedTemplate || 'arelance-corporate';
     try {
         updateProgress(20);
