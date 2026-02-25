@@ -188,14 +188,14 @@ IMPORTANTE para JSON válido: escapa comillas dobles dentro del texto como \" y 
         }
     ],
     "resumen": "resumen de 2-3 líneas para la portada",
-    "objetivos": ["Al finalizar serás capaz de...", "Comprenderás...", "Podrás aplicar..."],
+    "objetivos": ["[Comprender] Explicar cómo funciona...", "[Aplicar] Implementar...", "[Analizar] Distinguir entre..."],
     "conceptos_clave": [
         {"termino": "término", "definicion": "definición concisa (max 120 chars)"}
     ]
 }
 
 COMPONENTES DISPONIBLES (usa variedad, nunca más de 2 párrafos seguidos):
-- "parrafo": texto breve, máx 3-4 frases. Para introducciones y transiciones
+- "parrafo": texto introductorio o transicional. MÁXIMO 3-4 frases / 150 palabras. Si el contenido original es más largo, divídelo en MÚLTIPLES bloques "parrafo" separados (uno por párrafo o idea). Nunca acumules más de 150 palabras en un solo bloque parrafo.
 - "definicion": término + explicación en caja destacada azul
 - "lista": bullets visuales. Items = texto COMPLETO del original
 - "tabla": datos comparativos. Campo "filas", primera fila = cabecera
@@ -269,6 +269,17 @@ EJEMPLO MAL DISEÑO (evitar):
   proceso([CPU: es el cerebro, GPU: procesa gráficos, RAM: memoria]) = NO son pasos, son conceptos → usar tabla
   definicion(CPU) → definicion(GPU) → definicion(RAM) → lista([SSD, Placa]) = inconsistente
   parrafo, parrafo, parrafo, parrafo = documento de texto, no e-learning
+
+OBJETIVOS DE APRENDIZAJE (Taxonomía de Bloom):
+Genera 3-4 objetivos. Cada uno DEBE empezar con su nivel de Bloom entre corchetes, seguido de un verbo de acción específico de ese nivel:
+- [Recordar]: identificar, reconocer, listar, nombrar, enumerar, definir
+- [Comprender]: explicar, describir, resumir, interpretar, clasificar, distinguir
+- [Aplicar]: implementar, usar, ejecutar, resolver, demostrar, calcular
+- [Analizar]: comparar, examinar, diferenciar, organizar, desglosar, contrastar
+- [Evaluar]: valorar, justificar, criticar, defender, priorizar, argumentar
+- [Crear]: diseñar, formular, construir, planificar, proponer, desarrollar
+Varía los niveles: incluye siempre al menos [Comprender] y [Aplicar]. No repitas el mismo nivel dos veces.
+Ejemplos correctos: "[Comprender] Explicar los componentes principales de una placa base", "[Aplicar] Seleccionar los componentes adecuados según el presupuesto y el uso previsto"
 PROMPT
 );
 

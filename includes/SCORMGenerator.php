@@ -42,6 +42,7 @@ class SCORMGenerator
     public function generate(): string
     {
         $this->saveImages();
+        $this->copyCelebrationGif();
         $this->writeCSS();
         $this->writeJS_ScormApi();
         $this->writeJS_Funciones();
@@ -68,6 +69,14 @@ class SCORMGenerator
             if (!empty($img['data']) && !empty($img['filename'])) {
                 file_put_contents($imgDir . '/' . $img['filename'], $img['data']);
             }
+        }
+    }
+
+    private function copyCelebrationGif(): void
+    {
+        $src = dirname(__DIR__) . '/assets/img/celebration.gif';
+        if (file_exists($src)) {
+            copy($src, $this->tempPath . '/img/celebration.gif');
         }
     }
 
@@ -125,7 +134,7 @@ class SCORMGenerator
         $objHtml = '';
         if (!empty($unit['objetivos'])) {
             $objHtml = '<h2 class="site__objetivos">Objetivos</h2><ul class="objetivos">';
-            foreach ($unit['objetivos'] as $o) $objHtml .= '<li>' . $this->e($o) . '</li>';
+            foreach ($unit['objetivos'] as $o) $objHtml .= $this->renderObjetivo($o);
             $objHtml .= '</ul>';
         }
 
@@ -389,7 +398,7 @@ class SCORMGenerator
         $concItems = !empty($unit['conclusiones_ia']) ? $unit['conclusiones_ia'] : ($unit['objetivos'] ?? []);
         if (!empty($concItems)) {
             $conc .= '<ul class="conclusiones">';
-            foreach ($concItems as $o) $conc .= '<li>' . $this->e($o) . '</li>';
+            foreach ($concItems as $o) $conc .= $this->renderObjetivo($o);
             $conc .= '</ul>';
         }
         $steps[] = [
@@ -414,10 +423,14 @@ class SCORMGenerator
         }
         $nav .= '</div>';
 
+        $gifHtml = file_exists(dirname(__DIR__) . '/assets/img/celebration.gif')
+            ? '<img src="../img/celebration.gif" alt="¡Enhorabuena!" class="celebration-gif">'
+            : '';
         $steps[] = [
             'id' => 'step-final', 'label' => 'Fin de unidad', 'epi' => false, 'hide' => true,
             'html' => $this->wrapStep('step-final', true, false,
                 '<div class="card-box intro final-box"><div class="final-content">'
+                . $gifHtml
                 . '<h1 class="enhorabuena">&#127881; &iexcl;Enhorabuena!</h1>'
                 . '<h2>Has completado la Unidad ' . $udN . ': ' . $this->e($unit['titulo']) . '</h2>'
                 . $nav
@@ -495,6 +508,62 @@ class SCORMGenerator
             $blocks[] = $block;
         }
         return $blocks;
+    }
+
+    // =====================================================================
+    //  HELPERS PEDAGÓGICOS
+    // =====================================================================
+
+    /**
+     * Divide un texto largo en fragmentos de máx. $maxWords palabras,
+     * cortando siempre por límites de oración. Seguridad para bloques parrafo.
+     */
+    private function splitParrafo(string $text, int $maxWords = 200): array
+    {
+        $wordCount = str_word_count($text, 0, 'àáâãäåæçèéêëìíîïðñòóôõöùúûüýþÿÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖÙÚÛÜÝÞ');
+        if ($wordCount <= $maxWords) return [$text];
+
+        $sentences = preg_split('/(?<=[.!?])\s+/', $text, -1, PREG_SPLIT_NO_EMPTY);
+        $chunks = [];
+        $current = '';
+        $currentWords = 0;
+
+        foreach ($sentences as $sentence) {
+            $sw = str_word_count($sentence, 0, 'àáâãäåæçèéêëìíîïðñòóôõöùúûüýþÿÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖÙÚÛÜÝÞ');
+            if ($currentWords + $sw > $maxWords && $current !== '') {
+                $chunks[] = trim($current);
+                $current = $sentence . ' ';
+                $currentWords = $sw;
+            } else {
+                $current .= $sentence . ' ';
+                $currentWords += $sw;
+            }
+        }
+        if (trim($current) !== '') $chunks[] = trim($current);
+        return $chunks ?: [$text];
+    }
+
+    /**
+     * Renderiza un objetivo de aprendizaje con badge de nivel Bloom si corresponde.
+     * Compatible con objetivos sin prefijo Bloom (fallback sin badge).
+     */
+    private function renderObjetivo(string $obj): string
+    {
+        if (preg_match('/^\[(Recordar|Comprender|Aplicar|Analizar|Evaluar|Crear)\]\s*(.+)$/u', $obj, $m)) {
+            $colorMap = [
+                'Recordar'   => '#6b7280',
+                'Comprender' => '#3b82f6',
+                'Aplicar'    => '#10b981',
+                'Analizar'   => '#f59e0b',
+                'Evaluar'    => '#ef4444',
+                'Crear'      => '#8b5cf6',
+            ];
+            $color = $colorMap[$m[1]] ?? '#143554';
+            return '<li><span style="background:' . $color . ';color:#fff;padding:1px 7px;border-radius:3px;'
+                . 'font-size:0.72em;margin-right:6px;font-weight:700;letter-spacing:.03em;vertical-align:middle;">'
+                . $this->e($m[1]) . '</span>' . $this->e(trim($m[2])) . '</li>';
+        }
+        return '<li>' . $this->e($obj) . '</li>';
     }
 
     // =====================================================================
@@ -633,7 +702,9 @@ class SCORMGenerator
 
                 case 'parrafo':
                 default:
-                    $html .= '<p>' . $this->e($contenido) . '</p>';
+                    foreach ($this->splitParrafo($contenido) as $chunk) {
+                        $html .= '<p>' . $this->e($chunk) . '</p>';
+                    }
                     break;
             }
         }
@@ -1075,6 +1146,7 @@ img{max-width:100%}.d-none{display:none!important}
 .prevBtn:hover::after,.nextBtn:hover::after{border-color:#fff}
 @media(max-width:768px){.prevBtn,.nextBtn{width:40px;height:40px;top:auto;bottom:15px;transform:none}.prevBtn{left:15px}.nextBtn{right:15px}}
 .final-box{text-align:center;padding:3rem 2rem}
+.celebration-gif{width:220px;max-width:80%;margin:0 auto 1.5rem;display:block}
 .enhorabuena{font-size:2.2rem;color:var(--accent);margin-bottom:.5rem}
 .final-nav{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin:2rem 0}
 .btn-nav{display:inline-block;padding:.7rem 1.5rem;border-radius:50px;font-weight:600;font-size:.9rem;text-decoration:none;transition:all .3s;border:2px solid var(--primary);color:var(--primary);cursor:pointer;background:transparent}

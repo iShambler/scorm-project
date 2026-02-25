@@ -192,7 +192,7 @@ function renderUnitTabs() {
         
         ch += '<div class="tab-panel' + act + '" id="tab-panel-' + i + '">'
             + '<div class="panel-section"><h4>Resumen</h4><p>' + esc(u.resumen || '') + '</p></div>'
-            + '<div class="panel-section"><h4>Objetivos</h4><ul>' + (u.objetivos || []).map(o => '<li>' + esc(o) + '</li>').join('') + '</ul></div>'
+            + '<div class="panel-section"><h4>Objetivos</h4><ul>' + (u.objetivos || []).map(o => renderObjetivo(o)).join('') + '</ul></div>'
             + '<div class="panel-section"><h4>Estructura del contenido (' + (u.secciones?.length||0) + ' secciones)</h4>' + sectionsHtml + '</div>'
             + '<div class="panel-section"><h4>Conceptos clave (' + (u.conceptos_clave?.length||0) + ')</h4><div class="flashcard-grid">'
             + (u.conceptos_clave || []).map(f => '<div class="flashcard-item"><strong>' + esc(f.termino) + '</strong><span>' + esc(f.definicion) + '</span></div>').join('') + '</div></div>'
@@ -202,6 +202,19 @@ function renderUnitTabs() {
     });
     hdr.innerHTML = hh;
     cnt.innerHTML = ch;
+}
+
+function renderObjetivo(obj) {
+    const bloomColors = {
+        'Recordar': '#6b7280', 'Comprender': '#3b82f6', 'Aplicar': '#10b981',
+        'Analizar': '#f59e0b', 'Evaluar': '#ef4444', 'Crear': '#8b5cf6'
+    };
+    const m = obj.match(/^\[(Recordar|Comprender|Aplicar|Analizar|Evaluar|Crear)\]\s*(.+)$/);
+    if (m) {
+        const color = bloomColors[m[1]] || '#143554';
+        return `<li><span style="background:${color};color:#fff;padding:1px 7px;border-radius:3px;font-size:0.72em;margin-right:6px;font-weight:700;letter-spacing:.03em;vertical-align:middle;">${esc(m[1])}</span>${esc(m[2])}</li>`;
+    }
+    return `<li>${esc(obj)}</li>`;
 }
 
 function renderBlockPreview(b) {
