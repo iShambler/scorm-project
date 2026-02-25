@@ -87,13 +87,17 @@ try {
     // Solo se usarán imágenes fotográficas de Unsplash.
     logError('DEBUG generate: Word images SKIPPED (text/table captures, content already in text)');
     
-    // 4b. Imágenes automáticas de Unsplash (por keyword de cada sección)
-    $imageHelper = new ImageHelper(defined('UNSPLASH_API_KEY') ? UNSPLASH_API_KEY : '');
+    // 4b. Imágenes automáticas de Pexels (por keyword de cada sección)
+    $imageHelper = new ImageHelper(defined('PEXELS_API_KEY') ? PEXELS_API_KEY : '');
     if ($imageHelper->isAvailable()) {
         foreach ($units as &$unit) {
             if (!empty($unit['secciones'])) {
                 foreach ($unit['secciones'] as &$sec) {
                     $keyword = $sec['icono_keyword'] ?? '';
+                    // Fallback: usar título de sección como keyword si no hay icono_keyword
+                    if (empty($keyword) && !empty($sec['titulo'])) {
+                        $keyword = $sec['titulo'];
+                    }
                     if (!empty($keyword) && empty($sec['image'])) {
                         $img = $imageHelper->searchAndDownload($keyword);
                         if ($img) {

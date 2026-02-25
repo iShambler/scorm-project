@@ -359,23 +359,11 @@ async function loadTemplates() {
             let prev = tpl.preview_exists
                 ? '<img src="api/templates.php?preview=' + tpl.id + '" alt="' + esc(tpl.name) + '">'
                 : '<div style="color:#fff;font-size:.8rem;font-weight:600;text-align:center;padding:1rem">Aa</div>';
-            card.innerHTML = (!isDefault ? '<button class="template-delete" title="Eliminar">&times;</button>' : '')
-                + '<div class="template-preview" style="background:linear-gradient(135deg,' + pri + ',' + sec + ' 60%,' + acc + ')">'
+            card.innerHTML = '<div class="template-preview" style="background:linear-gradient(135deg,' + pri + ',' + sec + ' 60%,' + acc + ')">'
                 + prev + '<div class="tpl-color-bar"><span style="background:' + pri + '"></span><span style="background:' + sec + '"></span><span style="background:' + acc + '"></span></div></div>'
                 + '<div class="template-name">' + esc(tpl.name) + '</div>'
                 + '<div class="template-author">' + esc(tpl.author) + ' &middot; v' + tpl.version + '</div>';
-            card.addEventListener('click', e => { if (!e.target.classList.contains('template-delete')) selectTemplate(tpl.id); });
-            const del = card.querySelector('.template-delete');
-            if (del) del.addEventListener('click', async e => {
-                e.stopPropagation();
-                if (!confirm('Eliminar "' + tpl.name + '"?')) return;
-                try {
-                    const r = await fetch('api/templates.php?id=' + tpl.id, {method:'DELETE'});
-                    const d = await r.json();
-                    if (d.success) { if (selectedTemplate === tpl.id) selectedTemplate = json.data.default; loadTemplates(); }
-                    else alert(d.message);
-                } catch(err) { alert('Error al eliminar'); }
-            });
+            card.addEventListener('click', () => selectTemplate(tpl.id));
             grid.appendChild(card);
         });
         templatesLoaded = true;

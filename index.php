@@ -13,6 +13,7 @@
 
         <!-- Header -->
         <header class="app-header">
+            <img src="assets/img/logo.png" alt="Logo" class="app-logo">
             <div class="brand">
                 <span class="brand-word"><span class="brand-letter">S</span>CORM</span>
                 <span class="brand-word"><span class="brand-letter">G</span>enerator</span>

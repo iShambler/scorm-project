@@ -57,10 +57,13 @@ define('DEFAULT_HOURS', 50);
 define('SCORM_VERSION', '1.2');
 
 // =============================================
-// UNSPLASH API (Fase 4 — imágenes automáticas)
-// Obtén tu key gratis en: https://unsplash.com/developers
+// PEXELS API (Fase 4 — imágenes automáticas)
+// Obtén tu key gratis en: https://www.pexels.com/api/
 // =============================================
-define('UNSPLASH_API_KEY', $_ENV['UNSPLASH_API_KEY'] ?? 'tu-unsplash-key-aqui');
+define('PEXELS_API_KEY', $_ENV['PEXELS_API_KEY'] ?? '');
+
+// UNSPLASH API (mantenido como referencia, en desuso)
+define('UNSPLASH_API_KEY', $_ENV['UNSPLASH_API_KEY'] ?? '');
 
 // =============================================
 // COLORES CORPORATIVOS
@@ -96,6 +99,7 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown, sin explicaciones) con e
             "secciones": [
                 {
                     "titulo": "título de la sección",
+                    "icono_keyword": "keyword EN INGLÉS para imagen de banner (ej: keyboard technology, office workspace)",
                     "contenido_estructurado": [
                         {"tipo": "parrafo", "texto": "texto del párrafo"},
                         {"tipo": "definicion", "termino": "término", "texto": "definición"},

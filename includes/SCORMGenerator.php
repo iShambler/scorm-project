@@ -326,8 +326,8 @@ class SCORMGenerator
             $fh = '<p>Haz clic en cada tarjeta para ver la definici&oacute;n:</p><div class="flashcards-grid">';
             foreach ($unit['conceptos_clave'] as $c) {
                 $fh .= '<div class="flashcard" onclick="this.classList.toggle(\'flipped\')"><div class="flashcard-inner">'
-                    . '<div class="flashcard-front"><h4>' . $this->e($c['termino']) . '</h4><span class="flashcard-hint">Clic para ver</span></div>'
-                    . '<div class="flashcard-back"><p>' . $this->e($c['definicion']) . '</p></div>'
+                    . '<div class="flashcard-front"><h4>' . $this->e($c['termino'] ?? '') . '</h4><span class="flashcard-hint">Clic para ver</span></div>'
+                    . '<div class="flashcard-back"><p>' . $this->e($c['definicion'] ?? '') . '</p></div>'
                     . '</div></div>';
             }
             $fh .= '</div>';
