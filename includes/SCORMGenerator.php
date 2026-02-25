@@ -24,6 +24,7 @@ class SCORMGenerator
     private string $templateId;
 
     private array $templateData;
+    private int $accCounter = 0;  // contador global de acordeones por unidad (evita IDs duplicados)
 
     public function __construct(array $moduleConfig, array $units, array $images = [], string $templateId = 'arelance-corporate')
     {
@@ -74,9 +75,13 @@ class SCORMGenerator
 
     private function copyCelebrationGif(): void
     {
-        $src = dirname(__DIR__) . '/assets/img/celebration.gif';
-        if (file_exists($src)) {
-            copy($src, $this->tempPath . '/img/celebration.gif');
+        // Prioridad: video mp4 > gif
+        $srcMp4 = dirname(__DIR__) . '/assets/img/congratulationsc.mp4';
+        $srcGif  = dirname(__DIR__) . '/assets/img/celebration.gif';
+        if (file_exists($srcMp4)) {
+            copy($srcMp4, $this->tempPath . '/img/congratulationsc.mp4');
+        } elseif (file_exists($srcGif)) {
+            copy($srcGif, $this->tempPath . '/img/celebration.gif');
         }
     }
 
@@ -110,6 +115,7 @@ class SCORMGenerator
 
     private function buildUnitHTML(array $unit, int $idx, int $totalUnits): string
     {
+        $this->accCounter = 0;  // resetear IDs de acordeón para cada unidad
         $mod   = $this->e($this->moduleConfig['titulo']);
         $cod   = $this->e($this->moduleConfig['codigo']);
         $emp   = $this->e($this->moduleConfig['empresa'] ?? DEFAULT_COMPANY);
@@ -278,13 +284,28 @@ class SCORMGenerator
                             ];
                         }
                     } else {
-                        $imgHtml = $this->renderSectionImage($sec, $si);
+                        $layout = $si % 5;
+                        $imgHtml = $this->renderSectionImage($sec, $layout);
+                        if ($layout === 3 && !empty($imgHtml)) {
+                            // Imagen a la derecha, texto a la izquierda
+                            $inner = $secHeader . '<div class="sec-side-wrap img-right">'
+                                . '<div class="content-body sec-side-text">' . $fc . '</div>'
+                                . $imgHtml
+                                . '</div>';
+                        } elseif ($layout === 4 && !empty($imgHtml)) {
+                            // Imagen a la izquierda, texto a la derecha
+                            $inner = $secHeader . '<div class="sec-side-wrap img-left">'
+                                . $imgHtml
+                                . '<div class="content-body sec-side-text">' . $fc . '</div>'
+                                . '</div>';
+                        } else {
+                            $inner = $secHeader . $imgHtml . '<div class="content-body">' . $fc . '</div>';
+                        }
                         $steps[] = [
                             'id' => $secId,
                             'label' => $udN . '.' . $sn . '. ' . $sec['titulo'],
                             'epi' => true, 'hide' => false,
-                            'html' => $this->wrapStep($secId, true, true,
-                                $secHeader . $imgHtml . '<div class="content-body">' . $fc . '</div>')
+                            'html' => $this->wrapStep($secId, true, true, $inner)
                         ];
                     }
                 } else {
@@ -423,9 +444,15 @@ class SCORMGenerator
         }
         $nav .= '</div>';
 
-        $gifHtml = file_exists(dirname(__DIR__) . '/assets/img/celebration.gif')
-            ? '<img src="../img/celebration.gif" alt="¡Enhorabuena!" class="celebration-gif">'
-            : '';
+        if (file_exists(dirname(__DIR__) . '/assets/img/congratulationsc.mp4')) {
+            $gifHtml = '<video class="celebration-gif" autoplay muted playsinline loop>'
+                . '<source src="../img/congratulationsc.mp4" type="video/mp4">'
+                . '</video>';
+        } elseif (file_exists(dirname(__DIR__) . '/assets/img/celebration.gif')) {
+            $gifHtml = '<img src="../img/celebration.gif" alt="¡Enhorabuena!" class="celebration-gif">';
+        } else {
+            $gifHtml = '';
+        }
         $steps[] = [
             'id' => 'step-final', 'label' => 'Fin de unidad', 'epi' => false, 'hide' => true,
             'html' => $this->wrapStep('step-final', true, false,
@@ -572,7 +599,6 @@ class SCORMGenerator
     private function renderBlocks(array $bloques): string
     {
         $html = '';
-        $accN = 0;
         $tabN = 0;
 
         foreach ($bloques as $b) {
@@ -622,20 +648,21 @@ class SCORMGenerator
                     break;
 
                 case 'proceso':
-                    $aid = 'proc' . ($accN++);
+                    $aid = 'proc' . ($this->accCounter++);
                     $html .= '<div class="accordion-container">';
                     foreach ($items as $pi => $paso) {
                         $cid = $aid . 'p' . $pi;
-                        // Extraer titulo corto: antes del primer punto, o primeras 60 chars
-                        $dotPos = mb_strpos($paso, '. ');
-                        if ($dotPos !== false && $dotPos < 80) {
-                            $accTitle = mb_substr($paso, 0, $dotPos);
-                        } else {
-                            $spacePos = mb_strrpos(mb_substr($paso, 0, 60), ' ');
-                            $accTitle = $spacePos ? mb_substr($paso, 0, $spacePos) . '...' : mb_substr($paso, 0, 60) . '...';
-                        }
+                        // Quitar prefijo "Paso N." o "N." del texto para extraer título real
+                        $workText = preg_replace('/^(?:Paso\s*\d+\s*[.:]\s*|\d+\s*[.:]\s*)/u', '', $paso);
+                        $colonPos = mb_strpos($workText, ':');
+                        $dotPos   = mb_strpos($workText, '. ');
+                        $titleEnd = 60;
+                        if ($colonPos !== false && $colonPos < 60) $titleEnd = $colonPos;
+                        elseif ($dotPos !== false && $dotPos < 60) $titleEnd = $dotPos;
+                        $accTitle = mb_substr($workText, 0, $titleEnd);
+                        if (mb_strlen($workText) > mb_strlen($accTitle)) $accTitle .= '...';
                         $html .= '<div class="accordion-item">'
-                            . '<div class="accordion-header" onclick="toggleAccordion(\'' . $cid . '\')">' 
+                            . '<div class="accordion-header" onclick="toggleAccordion(\'' . $cid . '\')">'
                             . '<span class="acc-title">Paso ' . ($pi + 1) . ': ' . $this->e($accTitle) . '</span>'
                             . '<span class="accordion-arrow">&#8594;</span></div>'
                             . '<div class="accordion-body" id="' . $cid . '"><p>' . $this->e($paso) . '</p></div></div>';
@@ -775,13 +802,12 @@ class SCORMGenerator
 
         // Render
         $html = '';
-        $accN = 0;
         foreach ($groups as $g) {
             switch ($g['type']) {
                 case 'subtitle':
                     $html .= '<h4 class="section-subtitle">' . $this->e($g['text']) . '</h4>'; break;
                 case 'accordion':
-                $aid = 'acc' . ($accN++);
+                $aid = 'acc' . ($this->accCounter++);
                 $svgPool = ['book','lightbulb','layers','target','database','globe','shield','chart','puzzle','tool'];
                 $html .= '<div class="accordion-container">';
                 foreach ($g['items'] as $di => $d) {
@@ -1039,13 +1065,16 @@ img{max-width:100%}.d-none{display:none!important}
 .sec-num{color:var(--accent);font-weight:700;margin-right:.3rem}
 .icon-bullet{font-size:1.3rem}.titleicon{display:flex;align-items:center;gap:.5rem}
 .sec-header-icon svg{flex-shrink:0}
-.sec-banner{border-radius:var(--radius);overflow:hidden;position:relative;margin-bottom:1.5rem}
-.sec-banner img{display:block;width:100%;max-height:280px;object-fit:cover}
-.sec-img-credit{position:absolute;bottom:8px;right:12px;font-size:.72rem;color:#fff;background:rgba(0,0,0,.5);padding:3px 10px;border-radius:4px;z-index:2}
-.layout-full img{max-height:260px}
-.layout-card{margin:0 auto 1.5rem;max-width:580px;text-align:center;background:var(--card);padding:.5rem .5rem .2rem;box-shadow:var(--shadow);border-radius:var(--radius)}.layout-card img{max-height:240px;object-fit:contain;border-radius:8px}
-.sec-img-caption{display:block;font-size:.75rem;color:var(--text-light);margin-top:.4rem;padding-bottom:.3rem;font-style:italic}
-.layout-gradient img{max-height:280px}
+.sec-banner{border-radius:var(--radius);overflow:hidden;position:relative;margin-bottom:1.5rem;background:var(--bg)}
+.sec-banner img{display:block;width:100%;max-height:200px;object-fit:contain}
+.layout-full img{max-height:200px}
+.layout-card{margin:0 auto 1.5rem;max-width:480px;text-align:center;background:var(--card);padding:.5rem .5rem .2rem;box-shadow:var(--shadow);border-radius:var(--radius)}.layout-card img{max-height:180px;object-fit:contain;border-radius:8px}
+.layout-gradient img{max-height:200px}
+.sec-side-wrap{display:flex;gap:1.5rem;align-items:flex-start;margin-bottom:1rem}
+.sec-side-text{flex:1;min-width:0}
+.sec-side-img{flex:0 0 35%;max-width:35%;border-radius:var(--radius);overflow:hidden;background:var(--bg)}
+.sec-side-img img{display:block;width:100%;max-height:220px;object-fit:contain;border-radius:var(--radius)}
+@media(max-width:700px){.sec-side-wrap{flex-direction:column}.sec-side-img{flex:none;max-width:100%}}
 .sec-gradient-overlay{position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,.35) 0%,transparent 50%)}
 @media(max-width:600px){.sec-banner img{max-height:200px}.layout-card img{max-height:180px}}
 .idevice{animation:fadeSlideIn .4s ease-out}
@@ -1146,7 +1175,7 @@ img{max-width:100%}.d-none{display:none!important}
 .prevBtn:hover::after,.nextBtn:hover::after{border-color:#fff}
 @media(max-width:768px){.prevBtn,.nextBtn{width:40px;height:40px;top:auto;bottom:15px;transform:none}.prevBtn{left:15px}.nextBtn{right:15px}}
 .final-box{text-align:center;padding:3rem 2rem}
-.celebration-gif{width:220px;max-width:80%;margin:0 auto 1.5rem;display:block}
+.celebration-gif{width:280px;max-width:90%;margin:0 auto 1.5rem;display:block;border-radius:12px}
 .enhorabuena{font-size:2.2rem;color:var(--accent);margin-bottom:.5rem}
 .final-nav{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin:2rem 0}
 .btn-nav{display:inline-block;padding:.7rem 1.5rem;border-radius:50px;font-weight:600;font-size:.9rem;text-decoration:none;transition:all .3s;border:2px solid var(--primary);color:var(--primary);cursor:pointer;background:transparent}
@@ -1267,31 +1296,32 @@ CSSEND;
     }
 
     /**
-     * Renderiza imagen de sección con 3 layouts alternados (Fase 4)
-     * Layout 0: banner full-width
-     * Layout 1: card centrada con caption
-     * Layout 2: banner con overlay gradient
+     * Renderiza imagen de sección con 5 layouts alternados
+     * Layout 0: banner full-width (sin recorte)
+     * Layout 1: card centrada con caption (sin recorte)
+     * Layout 2: banner con overlay gradient (sin recorte)
+     * Layout 3: bloque lateral derecho (buildSteps gestiona el wrapper)
+     * Layout 4: bloque lateral izquierdo (buildSteps gestiona el wrapper)
      */
-    private function renderSectionImage(array $sec, int $sectionIndex = 0): string
+    private function renderSectionImage(array $sec, int $layout = 0): string
     {
         $img = $sec['image'] ?? '';
         if (empty($img)) return '';
-        $credit = $sec['image_credit'] ?? '';
         $alt = $this->e($sec['titulo'] ?? 'Imagen de sección');
-        $creditHtml = !empty($credit) ? '<span class="sec-img-credit">Foto: ' . $this->e($credit) . '</span>' : '';
         $src = '../img/' . $this->e($img);
-        $layout = $sectionIndex % 3;
 
         switch ($layout) {
-            case 0: // Banner full-width
-                return '<div class="sec-banner layout-full">' . $creditHtml . '<img src="' . $src . '" alt="' . $alt . '" loading="lazy"></div>';
-            case 1: // Card centrada con caption
-                $creditCaption = !empty($credit) ? '<figcaption class="sec-img-caption">Foto: ' . $this->e($credit) . '</figcaption>' : '';
-                return '<figure class="sec-banner layout-card"><img src="' . $src . '" alt="' . $alt . '" loading="lazy">' . $creditCaption . '</figure>';
-            case 2: // Banner con gradient overlay
-                return '<div class="sec-banner layout-gradient"><img src="' . $src . '" alt="' . $alt . '" loading="lazy"><div class="sec-gradient-overlay"></div>' . $creditHtml . '</div>';
+            case 0: // Banner full-width, sin recorte
+                return '<div class="sec-banner layout-full"><img src="' . $src . '" alt="' . $alt . '" loading="lazy"></div>';
+            case 1: // Card centrada, sin recorte
+                return '<figure class="sec-banner layout-card"><img src="' . $src . '" alt="' . $alt . '" loading="lazy"></figure>';
+            case 2: // Banner con gradient overlay, sin recorte
+                return '<div class="sec-banner layout-gradient"><img src="' . $src . '" alt="' . $alt . '" loading="lazy"><div class="sec-gradient-overlay"></div></div>';
+            case 3: // Lateral derecho — wrapper gestionado por buildSteps
+            case 4: // Lateral izquierdo — wrapper gestionado por buildSteps
+                return '<div class="sec-side-img"><img src="' . $src . '" alt="' . $alt . '" loading="lazy"></div>';
             default:
-                return '<div class="sec-banner layout-full">' . $creditHtml . '<img src="' . $src . '" alt="' . $alt . '" loading="lazy"></div>';
+                return '<div class="sec-banner layout-full"><img src="' . $src . '" alt="' . $alt . '" loading="lazy"></div>';
         }
     }
 

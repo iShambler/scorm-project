@@ -1,0 +1,33 @@
+{
+  "id": "blue-purple",
+  "name": "Blue & Purple",
+  "description": "Estilo moderno con azul profundo y acento morado. Ideal para formaciones tecnológicas, corporativas o creativas.",
+  "author": "Arelance",
+  "version": "1.0",
+  "colors": {
+    "primary": "#1e3a8a",
+    "secondary": "#2563eb",
+    "accent": "#7c3aed",
+    "bg": "#f0f4ff",
+    "card": "#ffffff",
+    "text": "#1e293b",
+    "text_light": "#64748b",
+    "border": "#c7d2fe",
+    "success": "#22c55e",
+    "danger": "#ef4444",
+    "warning": "#f59e0b"
+  },
+  "fonts": {
+    "heading": "Poppins",
+    "body": "Inter",
+    "code": "Fira Code"
+  },
+  "settings": {
+    "radius": "12px",
+    "portada_style": "gradient",
+    "sidebar_style": "gradient",
+    "google_fonts_url": "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap"
+  },
+  "logo": "",
+  "portada_bg": ""
+}

@@ -204,7 +204,7 @@ COMPONENTES DISPONIBLES (usa variedad, nunca más de 2 párrafos seguidos):
 - "lista": bullets visuales. Items = texto COMPLETO del original
 - "tabla": datos comparativos. Campo "filas", primera fila = cabecera
 - "comparativa": 2-4 elementos en TABS interactivas ("items" formato "Nombre: descripción")
-- "proceso": pasos en ACORDEÓN desplegable. SOLO para procedimientos REALES paso a paso (ej: montar un PC, instalar software). NUNCA para listar conceptos o componentes.
+- "proceso": pasos en ACORDEÓN desplegable. Úsalo siempre que el contenido tenga ítems con cierto orden o estructura interna: (1) procedimientos paso a paso secuenciales, (2) protocolos o fases de actuación numeradas, (3) escalas de valoración o criterios de evaluación con ítems ordenados, (4) algoritmos de decisión con pasos definidos. NUNCA para simples listas de conceptos sin orden ni estructura interna.
 - "importante": caja amarilla de advertencia
 - "sabias_que": caja verde de dato complementario
 - "ejemplo": caja con caso práctico
@@ -218,7 +218,7 @@ REGLAS DE FIDELIDAD (prioridad máxima):
    - Si el documento tiene un caso práctico → conviértelo en "ejemplo"
    - Si NO hay datos curiosos ni ejemplos en el documento → NO los añadas
 4. Al dividir párrafos largos: corta por oraciones completas, sin cambiar el orden ni mezclar párrafos distintos.
-5. Items de listas = texto ÍNTEGRO del bullet original del Word.
+5. Items de listas = texto ÍNTEGRO del bullet original del Word. CONSERVA TODOS los signos de puntuación, incluyendo los dos puntos (:). NUNCA elimines los dos puntos de los ítems. Correcto: "Alimentación: Independiente = 10 puntos". Incorrecto: "Alimentación Independiente = 10 puntos".
 
 REGLAS DE AGRUPACIÓN (clave para buen diseño):
 
@@ -227,12 +227,12 @@ Cuando el contenido presenta 3 o más elementos del MISMO tipo seguidos, SIEMPRE
 - 3+ conceptos con nombre y descripción → UNA "tabla" con columnas [Nombre, Descripción]
 - 3+ ventajas o características → UNA "lista" (no 3 párrafos separados)
 - 2-4 opciones contrastadas → UNA "comparativa" (tabs)
-- 3+ pasos de un PROCEDIMIENTO REAL (instrucciones que se siguen en orden) → UN "proceso" (acordeón)
+- 3+ pasos de un PROCEDIMIENTO REAL, criterios de una ESCALA/PROTOCOLO, o fases de actuación → UN "proceso" (acordeón)
 
 NUNCA hagas esto:
 - 3 "definicion" seguidas + 2 items en "lista" para el mismo grupo de conceptos (inconsistente)
 - Separar elementos homólogos en tipos de bloque distintos
-- Usar "proceso" para listar conceptos, componentes o características. "Proceso" es SOLO para procedimientos paso a paso (ej: "Paso 1: Instalar drivers, Paso 2: Configurar BIOS")
+- Usar "proceso" para listar conceptos sin orden lógico. "Proceso" es para pasos, protocolos, escalas y criterios con secuencia (ej: "Paso 1: acción A"; "Criterio 1: descripción + valor")
 
 Regla simple: si puedes decir "estos N items son del mismo tipo/categoría", van en UN SOLO bloque.
 
@@ -249,7 +249,7 @@ REGLAS DE DISEÑO:
 
 2. COMPONENTES INTERACTIVOS: Usa estos siempre que el contenido lo permita:
    - Dos cosas que comparar → "comparativa" (genera tabs clicables)
-   - Procedimiento real con pasos ordenados → "proceso" (genera acordeón)
+   - Procedimiento/protocolo/escala con pasos o criterios ordenados → "proceso" (genera acordeón)
    - Grupo de conceptos con nombre + descripción → "tabla" (muy visual y compacta, es el DEFAULT)
 
 3. MÁX 2 "definicion" por sección. Si hay 3+, usa tabla o acordeón.
@@ -268,6 +268,8 @@ EJEMPLO BUEN DISEÑO:
   Componentes de PC: parrafo(intro) → tabla([Componente, Función]: CPU/GPU/RAM/SSD/Placa) → sabias_que → importante
   Ventajas gaming: parrafo(intro) → tabla([Ventaja, Detalle]: Personalización/Rendimiento/Biblioteca/Periféricos)
   Montar un PC: parrafo(intro) → proceso([Instalar CPU, Montar RAM, Conectar GPU...]) ← ESTO sí es proceso (pasos reales)
+  Escala de valoración: parrafo(intro) → proceso([Criterio 1: descripción + puntuación, Criterio 2: descripción + puntuación, ...]) ← escala con criterios puntuados = proceso
+  Protocolo de N pasos: parrafo(intro) → proceso([Paso 1: acción A, Paso 2: acción B, Paso 3: acción C]) ← fases secuenciales = proceso
 
 EJEMPLO MAL DISEÑO (evitar):
   proceso([CPU: es el cerebro, GPU: procesa gráficos, RAM: memoria]) = NO son pasos, son conceptos → usar tabla
