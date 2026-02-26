@@ -269,9 +269,14 @@ class SCORMGenerator
                 if (!empty($blocks)) {
                     // Renderizar con componentes visuales
                     $fc = $this->renderBlocks($blocks);
-                    if (mb_strlen($fc) > 8000) {
-                        $halfBlocks = array_chunk($blocks, (int)ceil(count($blocks) / 2));
-                        foreach ($halfBlocks as $pi => $blockChunk) {
+                    $maxChars = defined('MAX_SCREEN_CHARS') ? MAX_SCREEN_CHARS : 8000;
+                    if (mb_strlen($fc) > $maxChars) {
+                        // Split inteligente si enrichment activo, naive si no
+                        $useSmartSplit = !empty($unit['_enrichment']);
+                        $blockChunks = $useSmartSplit
+                            ? $this->smartSplitBlocks($blocks, $maxChars)
+                            : array_chunk($blocks, (int)ceil(count($blocks) / 2));
+                        foreach ($blockChunks as $pi => $blockChunk) {
                             $pid = $secId . ($pi > 0 ? '_' . ($pi + 1) : '');
                             $isFirst = ($pi === 0);
                             $steps[] = [
@@ -851,6 +856,43 @@ class SCORMGenerator
         }
         if (!empty(trim($cur))) $pages[] = trim($cur);
         return $pages ?: [$c];
+    }
+
+    /**
+     * Split inteligente: acumula bloques midiendo HTML renderizado,
+     * crea nuevo chunk al superar el threshold. Respeta límites entre bloques.
+     */
+    private function smartSplitBlocks(array $blocks, int $maxChars): array
+    {
+        if (empty($blocks)) return [$blocks];
+
+        $chunks = [];
+        $currentChunk = [];
+        $currentLen = 0;
+
+        foreach ($blocks as $block) {
+            $blockLen = mb_strlen($this->renderBlocks([$block]));
+
+            if ($currentLen + $blockLen > $maxChars && !empty($currentChunk)) {
+                $chunks[] = $currentChunk;
+                $currentChunk = [];
+                $currentLen = 0;
+            }
+
+            $currentChunk[] = $block;
+            $currentLen += $blockLen;
+        }
+
+        if (!empty($currentChunk)) {
+            $chunks[] = $currentChunk;
+        }
+
+        // Fallback: si solo quedó 1 chunk, dividir en 2 como el original
+        if (count($chunks) < 2 && count($blocks) > 1) {
+            return array_chunk($blocks, (int)ceil(count($blocks) / 2));
+        }
+
+        return $chunks;
     }
 
     // =====================================================================

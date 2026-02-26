@@ -65,6 +65,10 @@ define('DEFAULT_COMPANY', 'ARELANCE S.L.');
 define('DEFAULT_HOURS', 50);
 define('SCORM_VERSION', '1.2');
 
+// Enrichment: split inteligente de pantallas largas
+define('ENABLE_ENRICHMENT_DEFAULT', true);
+define('MAX_SCREEN_CHARS', 8000);
+
 // =============================================
 // PEXELS API (Fase 4 — imágenes automáticas)
 // Obtén tu key gratis en: https://www.pexels.com/api/

@@ -272,6 +272,7 @@ async function generateSCORM() {
         }
     });
     analysisData.template_id = selectedTemplate || 'arelance-corporate';
+    analysisData.enrichment = document.getElementById('cfg-enrichment').checked;
     try {
         updateProgress(20);
         const resp = await fetch('api/generate.php', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(analysisData) });

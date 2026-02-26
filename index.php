@@ -217,6 +217,20 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="units-list" id="units-list"></div>
             <div class="summary-grid" id="summary-stats"></div>
             <hr class="divider">
+            <h3 class="section-title">Opciones avanzadas</h3>
+            <div class="form-grid">
+                <div class="form-group full" style="display:flex;align-items:center;gap:1rem;">
+                    <label for="cfg-enrichment" style="flex:1;">
+                        <strong>Enriquecer contenido</strong>
+                        <span style="display:block;font-size:.85em;color:#666;margin-top:.25rem;">Divide pantallas largas de forma inteligente respetando los límites naturales entre bloques de contenido.</span>
+                    </label>
+                    <label class="toggle-switch" style="flex-shrink:0;">
+                        <input type="checkbox" id="cfg-enrichment" <?= ENABLE_ENRICHMENT_DEFAULT ? 'checked' : '' ?>>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+            <hr class="divider">
             <h3 class="section-title">Plantilla de estilo</h3>
             <div class="templates-grid" id="templates-grid"><div class="template-loading">Cargando plantillas...</div></div>
             <div class="template-actions">

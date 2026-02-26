@@ -64,6 +64,9 @@ try {
         'empresa' => $data['modulo']['empresa'] ?? DEFAULT_COMPANY
     ];
     
+    // Flag de enrichment (split inteligente de pantallas)
+    $enrichment = !empty($data['enrichment']);
+
     // Preparar unidades
     $units = [];
     foreach ($data['unidades'] as $unit) {
@@ -79,6 +82,7 @@ try {
             'preguntas' => $unit['preguntas'] ?? [],
             'codigo' => $unit['codigo'] ?? [],
             '_enriched' => $unit['_enriched'] ?? false,
+            '_enrichment' => $enrichment,
             'conclusiones_ia' => $unit['conclusiones_ia'] ?? []
         ];
     }
