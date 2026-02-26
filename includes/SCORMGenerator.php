@@ -191,7 +191,6 @@ class SCORMGenerator
   ' . $this->getLogoHTML('../', 'topnav-logo-img') . '
   <span class="topnav-title">Ud.&nbsp;' . $udN . '</span>
   <div class="topnav-units">' . $this->buildUnitNav($idx) . '</div>
-  <span class="topnav-empresa">' . $emp . '</span>
 </nav>
 
 <!-- HOME: Vista 1 — Presentación + Objetivos -->

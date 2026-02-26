@@ -10,6 +10,15 @@
  */
 
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/Auth.php';
+
+$auth = new \ScormConverter\Auth();
+if (!$auth->isLoggedIn()) {
+    header('Content-Type: application/json; charset=utf-8');
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'No autenticado']);
+    exit;
+}
 require_once __DIR__ . '/../includes/TemplateManager.php';
 
 use ScormConverter\TemplateManager;

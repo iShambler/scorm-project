@@ -36,6 +36,15 @@ define('CLAUDE_MODEL', 'claude-sonnet-4-20250514');
 define('CLAUDE_MAX_TOKENS', 16000);
 
 // =============================================
+// BASE DE DATOS (MySQL)
+// =============================================
+define('DB_HOST', $_ENV['DB_HOST'] ?? 'localhost');
+define('DB_NAME', $_ENV['DB_NAME'] ?? 'scorm_generator');
+define('DB_USER', $_ENV['DB_USER'] ?? 'root');
+define('DB_PASS', $_ENV['DB_PASS'] ?? '');
+define('DB_CHARSET', 'utf8mb4');
+
+// =============================================
 // CONFIGURACIÓN DE RUTAS
 // =============================================
 define('BASE_PATH', __DIR__);

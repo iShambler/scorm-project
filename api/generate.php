@@ -5,11 +5,17 @@
  */
 
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/Auth.php';
 require_once __DIR__ . '/../includes/SCORMGenerator.php';
 require_once __DIR__ . '/../includes/ImageHelper.php';
 
+use ScormConverter\Auth;
 use ScormConverter\SCORMGenerator;
 use ScormConverter\ImageHelper;
+
+// Verificar autenticación
+$auth = new Auth();
+$auth->requireLogin();
 
 ini_set('display_errors', 0);
 error_reporting(E_ALL);

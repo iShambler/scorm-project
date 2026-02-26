@@ -5,6 +5,14 @@
  */
 
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/Auth.php';
+
+// Verificar autenticación
+$auth = new \ScormConverter\Auth();
+if (!$auth->isLoggedIn()) {
+    http_response_code(401);
+    die('No autenticado');
+}
 
 // Obtener ID de descarga
 $downloadId = $_GET['id'] ?? '';

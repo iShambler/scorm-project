@@ -5,11 +5,17 @@
  */
 
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/Auth.php';
 require_once __DIR__ . '/../includes/WordProcessor.php';
 require_once __DIR__ . '/../includes/AIProcessor.php';
 
+use ScormConverter\Auth;
 use ScormConverter\WordProcessor;
 use ScormConverter\AIProcessor;
+
+// Verificar autenticación
+$auth = new Auth();
+$auth->requireLogin();
 
 // Capturar errores PHP para no romper JSON
 ini_set('display_errors', 0);

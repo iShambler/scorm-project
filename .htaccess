@@ -24,6 +24,16 @@
 </Files>
 
 # Permitir API endpoints
+<Files "auth.php">
+    <IfModule mod_authz_core.c>
+        Require all granted
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Allow from all
+    </IfModule>
+</Files>
+
 <Files "analyze.php">
     <IfModule mod_authz_core.c>
         Require all granted
@@ -93,6 +103,9 @@
     
     # Bloquear acceso directo a logs
     RewriteRule ^logs/ - [F,L]
+    
+    # Bloquear acceso directo a data
+    RewriteRule ^data/ - [F,L]
     
     # Permitir API
     RewriteCond %{REQUEST_URI} ^/api/
