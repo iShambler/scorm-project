@@ -116,6 +116,21 @@ PROMPT;
     }
 
     /**
+     * Reestructura el texto crudo de una unidad para optimizar el análisis posterior.
+     * Devuelve texto plano reorganizado (no JSON).
+     */
+    public function restructureUnit(string $unitTitle, string $unitContent, int $unitNumber): string
+    {
+        $prompt = PROMPT_RESTRUCTURE;
+        $prompt = str_replace('{unit_title}', $unitTitle, $prompt);
+        $prompt = str_replace('{unit_content}', $this->truncateContent($unitContent, 25000), $prompt);
+        $prompt = str_replace('{unit_number}', (string)$unitNumber, $prompt);
+
+        $response = $this->callAPI($prompt);
+        return trim($response);
+    }
+
+    /**
      * Enriquece secciones clasificando cada bloque por tipo de componente visual
      * Fase 2: la IA decide qué componente usar para cada fragmento de contenido
      * @deprecated Usar structureUnit() en su lugar

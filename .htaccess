@@ -94,12 +94,25 @@
     </IfModule>
 </Files>
 
+<Files "generate_pdf.php">
+    <IfModule mod_authz_core.c>
+        Require all granted
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Allow from all
+    </IfModule>
+</Files>
+
 # Proteger carpetas sensibles
 <IfModule mod_rewrite.c>
     RewriteEngine On
     
     # Bloquear acceso directo a includes
     RewriteRule ^includes/ - [F,L]
+
+    # Bloquear acceso directo a libs (TCPDF)
+    RewriteRule ^libs/ - [F,L]
     
     # Bloquear acceso directo a logs
     RewriteRule ^logs/ - [F,L]

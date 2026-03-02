@@ -66,6 +66,7 @@ function initButtons() {
     document.getElementById('btn-analyze').addEventListener('click', analyzeDocument);
     document.getElementById('btn-generate').addEventListener('click', generateSCORM);
     document.getElementById('btn-download').addEventListener('click', downloadSCORM);
+    document.getElementById('btn-download-pdf').addEventListener('click', generateAndDownloadPDF);
 }
 
 // ── AI Status ──
@@ -299,6 +300,35 @@ function downloadSCORM() {
     window.location.href = 'api/download.php?id=' + downloadData.download_id + '&filename=' + encodeURIComponent(downloadData.filename);
 }
 
+async function generateAndDownloadPDF() {
+    const btn = document.getElementById('btn-download-pdf');
+    const originalHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-sm"></span> Generando PDF...';
+
+    try {
+        const payload = JSON.parse(JSON.stringify(analysisData));
+        payload.template_id = selectedTemplate || 'arelance-corporate';
+
+        const resp = await fetch('api/generate_pdf.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await resp.json();
+        if (!result.success) throw new Error(result.message || 'Error al generar PDF');
+
+        window.location.href = 'api/download.php?id=' + result.data.download_id
+            + '&filename=' + encodeURIComponent(result.data.filename)
+            + '&format=pdf';
+    } catch (err) {
+        alert('Error: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+    }
+}
+
 // ── Navigation ──
 function goToStep(step) {
     document.querySelectorAll('.step-content').forEach(e => e.classList.add('hidden'));
@@ -336,41 +366,57 @@ function esc(t) { if (!t) return ''; const d = document.createElement('div'); d.
 // Keep old name for compatibility
 var escapeHtml = esc;
 
-// ── Templates ──
+// ── Templates / Temas ──
 async function loadTemplates() {
     const grid = document.getElementById('templates-grid');
     if (!grid) return;
     try {
         const resp = await fetch('api/templates.php');
-        const text = await resp.text();
-        console.log('Templates API raw:', text);
-        let json;
-        try { json = JSON.parse(text); } catch(e) { throw new Error('API no devuelve JSON: ' + text.substring(0, 200)); }
+        const json = await resp.json();
         if (!json.success) throw new Error(json.message);
-        const templates = json.data.templates;
-        selectedTemplate = json.data.default;
+        const presets = json.data.presets || [];
+        const userThemes = json.data.user_themes || [];
+        selectedTemplate = selectedTemplate || json.data.default;
         grid.innerHTML = '';
-        templates.forEach(tpl => {
+
+        // Preset arelance
+        presets.forEach(tpl => {
             const colors = tpl.colors || {};
-            const isDefault = tpl.id === json.data.default;
+            const pri = colors.primary || '#143554', acc = colors.accent || '#F05726';
             const card = document.createElement('div');
-            card.className = 'template-card' + (tpl.id === selectedTemplate ? ' selected' : '') + (isDefault ? ' is-default' : '');
+            card.className = 'template-card' + (tpl.id === selectedTemplate ? ' selected' : '');
             card.dataset.templateId = tpl.id;
-            const pri = colors.primary || '#143554', sec = colors.secondary || '#1a4a6e', acc = colors.accent || '#F05726';
-            let prev = tpl.preview_exists
-                ? '<img src="api/templates.php?preview=' + tpl.id + '" alt="' + esc(tpl.name) + '">'
-                : '<div style="color:#fff;font-size:.8rem;font-weight:600;text-align:center;padding:1rem">Aa</div>';
-            card.innerHTML = '<div class="template-preview" style="background:linear-gradient(135deg,' + pri + ',' + sec + ' 60%,' + acc + ')">'
-                + prev + '<div class="tpl-color-bar"><span style="background:' + pri + '"></span><span style="background:' + sec + '"></span><span style="background:' + acc + '"></span></div></div>'
-                + '<div class="template-name">' + esc(tpl.name) + '</div>'
-                + '<div class="template-author">' + esc(tpl.author) + ' &middot; v' + tpl.version + '</div>';
+            card.innerHTML = '<div class="template-preview" style="background:linear-gradient(135deg,' + pri + ' 0%,' + acc + ' 100%)">'
+                + '<div style="color:#fff;font-size:.8rem;font-weight:600;text-align:center;padding:1rem">Aa</div>'
+                + '<div class="tpl-color-bar"><span style="background:' + pri + '"></span><span style="background:' + acc + '"></span></div></div>'
+                + '<div class="template-name">' + esc(tpl.name) + '</div>';
             card.addEventListener('click', () => selectTemplate(tpl.id));
             grid.appendChild(card);
         });
+
+        // Temas del usuario
+        userThemes.forEach(theme => {
+            const pri = theme.color_primary || '#143554', acc = theme.color_accent || '#F05726';
+            const tid = 'theme_' + theme.id;
+            const card = document.createElement('div');
+            card.className = 'template-card' + (tid === selectedTemplate ? ' selected' : '');
+            card.dataset.templateId = tid;
+            const ownerLabel = theme.username ? '<span class="theme-owner">' + esc(theme.username) + '</span>' : '';
+            card.innerHTML = '<button class="btn-delete-theme" onclick="event.stopPropagation();deleteTheme(' + theme.id + ')" title="Eliminar">&times;</button>'
+                + '<div class="template-preview" style="background:linear-gradient(135deg,' + pri + ' 0%,' + acc + ' 100%)">'
+                + '<div style="color:#fff;font-size:.8rem;font-weight:600;text-align:center;padding:1rem">Aa</div>'
+                + (theme.logo_filename ? '<img src="uploads/logos/' + esc(theme.logo_filename) + '" class="theme-card-logo">' : '')
+                + '<div class="tpl-color-bar"><span style="background:' + pri + '"></span><span style="background:' + acc + '"></span></div></div>'
+                + '<div class="template-name">' + esc(theme.name) + ownerLabel + '</div>';
+            card.addEventListener('click', () => selectTemplate(tid));
+            card.addEventListener('dblclick', (e) => { e.stopPropagation(); editTheme(theme); });
+            grid.appendChild(card);
+        });
+
         templatesLoaded = true;
     } catch(err) {
         console.error('Templates load error:', err);
-        grid.innerHTML = '<div class="template-loading">No se pudieron cargar las plantillas: ' + esc(err.message) + '</div>';
+        grid.innerHTML = '<div class="template-loading">Error: ' + esc(err.message) + '</div>';
     }
 }
 
@@ -379,14 +425,91 @@ function selectTemplate(id) {
     document.querySelectorAll('.template-card').forEach(c => c.classList.toggle('selected', c.dataset.templateId === id));
 }
 
-async function importTemplate(e) {
-    const file = e.target.files[0]; if (!file) return;
-    const fd = new FormData(); fd.append('template', file);
+function toggleCreateTheme() {
+    const form = document.getElementById('create-theme-form');
+    if (form.classList.contains('hidden')) {
+        resetThemeForm();
+        form.classList.remove('hidden');
+    } else {
+        resetThemeForm();
+    }
+}
+
+async function createTheme() {
+    const name = document.getElementById('theme-name').value.trim();
+    const primary = document.getElementById('theme-primary').value;
+    const accent = document.getElementById('theme-accent').value;
+    const logoInput = document.getElementById('theme-logo');
+    if (!name) { alert('Escribe un nombre para el tema'); return; }
+
+    const fd = new FormData();
+    fd.append('name', name);
+    fd.append('color_primary', primary);
+    fd.append('color_accent', accent);
+    if (logoInput.files[0]) fd.append('logo', logoInput.files[0]);
+
     try {
-        const resp = await fetch('api/templates.php?action=import', {method:'POST', body:fd});
+        const resp = await fetch('api/templates.php?action=create', { method: 'POST', body: fd });
         const json = await resp.json();
-        alert(json.message);
-        if (json.success) { selectedTemplate = json.data.id; loadTemplates(); }
-    } catch(err) { alert('Error al importar'); }
-    e.target.value = '';
+        if (!json.success) throw new Error(json.message);
+        selectedTemplate = 'theme_' + json.data.id;
+        resetThemeForm();
+        loadTemplates();
+    } catch(err) { alert('Error: ' + err.message); }
+}
+
+function editTheme(theme) {
+    const form = document.getElementById('create-theme-form');
+    form.classList.remove('hidden');
+    document.getElementById('theme-name').value = theme.name;
+    document.getElementById('theme-primary').value = theme.color_primary;
+    document.getElementById('theme-accent').value = theme.color_accent;
+    // Cambiar botón guardar para que actualice en vez de crear
+    const saveBtn = form.querySelector('.btn-primary');
+    saveBtn.textContent = 'Actualizar tema';
+    saveBtn.setAttribute('onclick', 'updateTheme(' + theme.id + ')');
+}
+
+async function updateTheme(id) {
+    const name = document.getElementById('theme-name').value.trim();
+    const primary = document.getElementById('theme-primary').value;
+    const accent = document.getElementById('theme-accent').value;
+    const logoInput = document.getElementById('theme-logo');
+    if (!name) { alert('Escribe un nombre para el tema'); return; }
+
+    const fd = new FormData();
+    fd.append('name', name);
+    fd.append('color_primary', primary);
+    fd.append('color_accent', accent);
+    if (logoInput.files[0]) fd.append('logo', logoInput.files[0]);
+
+    try {
+        const resp = await fetch('api/templates.php?action=update&id=' + id, { method: 'POST', body: fd });
+        const json = await resp.json();
+        if (!json.success) throw new Error(json.message);
+        selectedTemplate = 'theme_' + id;
+        resetThemeForm();
+        loadTemplates();
+    } catch(err) { alert('Error: ' + err.message); }
+}
+
+function resetThemeForm() {
+    const form = document.getElementById('create-theme-form');
+    form.classList.add('hidden');
+    document.getElementById('theme-name').value = '';
+    document.getElementById('theme-logo').value = '';
+    const saveBtn = form.querySelector('.btn-primary');
+    saveBtn.textContent = 'Guardar tema';
+    saveBtn.setAttribute('onclick', 'createTheme()');
+}
+
+async function deleteTheme(id) {
+    if (!confirm('¿Eliminar este tema?')) return;
+    try {
+        const resp = await fetch('api/templates.php?id=' + id, { method: 'DELETE' });
+        const json = await resp.json();
+        if (!json.success) throw new Error(json.message);
+        if (selectedTemplate === 'theme_' + id) selectedTemplate = 'arelance-corporate';
+        loadTemplates();
+    } catch(err) { alert('Error: ' + err.message); }
 }

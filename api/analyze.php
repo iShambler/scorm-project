@@ -111,7 +111,33 @@ try {
             // Paso 1: Obtener unidades del Word con su contenido
             $outline = $wordProcessor->buildStructuredOutline();
             logError('DEBUG outline: ' . count($outline['units']) . ' units detected, module="' . $outline['module_title'] . '"');
-            
+
+            // ============================================================
+            // REESTRUCTURACIÓN: La IA reorganiza el texto crudo de cada UD
+            // antes del análisis. Mejora párrafos, definiciones, listas, etc.
+            // Mantiene la numeración original del documento.
+            // ============================================================
+            if (!empty($outline['units'])) {
+                foreach ($outline['units'] as &$ou) {
+                    try {
+                        $rawText = $wordProcessor->outlineToText(['module_title' => '', 'units' => [$ou]]);
+                        $unitNum = $ou['number'] ?? 1;
+                        logError('DEBUG restructureUnit UD' . $unitNum . ': "' . mb_substr($ou['title'], 0, 40) . '" (' . strlen($rawText) . ' chars)');
+
+                        $restructured = $aiProcessor->restructureUnit($ou['title'], $rawText, $unitNum);
+
+                        if (!empty($restructured) && strlen($restructured) > 100) {
+                            $ou['content'] = array_filter(explode("\n\n", $restructured), 'strlen');
+                            $ou['_restructured'] = true;
+                            logError('DEBUG restructureUnit UD' . $unitNum . ': OK (' . strlen($restructured) . ' chars)');
+                        }
+                    } catch (\Exception $e) {
+                        logError('Error restructureUnit UD' . ($ou['number'] ?? '?') . ': ' . $e->getMessage());
+                    }
+                }
+                unset($ou);
+            }
+
             // ============================================================
             // SMART MERGING: Si el documento es pequeño, reducir UDs
             // Un documento de <5000 chars no necesita 6 unidades.

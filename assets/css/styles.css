@@ -90,6 +90,8 @@ body{font-family:var(--font);background:var(--bg);min-height:100%;color:var(--te
 .btn-primary:hover:not(:disabled){background:var(--primary-mid)}
 .btn-accent{background:var(--accent);color:#fff}
 .btn-accent:hover:not(:disabled){background:var(--accent-h)}
+.btn-primary-outline{background:transparent;color:var(--primary);border:1.5px solid var(--primary)}
+.btn-primary-outline:hover:not(:disabled){background:var(--primary);color:#fff}
 .btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}
 .btn-ghost:hover:not(:disabled){background:var(--bg-card);color:var(--text)}
 .btn-sm{padding:.4rem .7rem;font-size:.78rem}
@@ -97,6 +99,9 @@ body{font-family:var(--font);background:var(--bg);min-height:100%;color:var(--te
 .btn-full{width:100%;margin-top:.75rem}
 .btn-icon{width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;color:var(--text3);transition:all .15s}
 .btn-icon:hover{background:rgba(0,0,0,.05);color:var(--red)}
+.download-buttons{display:flex;flex-direction:column;gap:.5rem;width:100%;margin-top:.75rem}
+.spinner-sm{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-radius:50%;border-top-color:currentColor;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
 .btn-group{display:flex;gap:.6rem;margin-top:1.75rem}
 .btn-group .btn:last-child{flex:1}
 .mt-3{margin-top:.75rem}
@@ -175,6 +180,7 @@ body{font-family:var(--font);background:var(--bg);min-height:100%;color:var(--te
 .template-card.selected::after{content:'\2713';position:absolute;top:.4rem;right:.4rem;background:var(--accent);color:#fff;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700}
 .template-preview{width:100%;height:64px;border-radius:6px;margin-bottom:.5rem;overflow:hidden;display:flex;align-items:center;justify-content:center;position:relative}
 .template-preview img{width:100%;height:100%;object-fit:cover}
+.template-preview .theme-card-logo{position:absolute;top:6px;left:6px;width:auto;height:24px;object-fit:contain;border-radius:2px}
 .template-preview .tpl-color-bar{display:flex;position:absolute;bottom:0;left:0;right:0;height:3px}
 .template-preview .tpl-color-bar span{flex:1;height:100%}
 .template-name{font-weight:600;font-size:.8rem;color:var(--text)}
@@ -292,3 +298,12 @@ body{font-family:var(--font);background:var(--bg);min-height:100%;color:var(--te
 .toggle-slider::before{content:"";position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
 .toggle-switch input:checked+.toggle-slider{background:#F05726}
 .toggle-switch input:checked+.toggle-slider::before{transform:translateX(22px)}
+
+/* Crear tema */
+.create-theme-form{background:var(--card-bg,#1a2332);border:1px solid var(--border-color,#2a3a4a);border-radius:12px;padding:1.25rem;margin-top:.75rem}
+.create-theme-form input[type="color"]{width:100%;height:38px;border:1px solid var(--border-color,#2a3a4a);border-radius:8px;cursor:pointer;padding:2px}
+.template-card{position:relative}
+.btn-delete-theme{position:absolute;top:4px;left:4px;z-index:2;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:14px;line-height:22px;text-align:center;cursor:pointer;opacity:0;transition:.2s}
+.template-card:hover .btn-delete-theme{opacity:1}
+.btn-delete-theme:hover{background:#ef4444}
+.theme-owner{display:block;font-size:.7rem;color:#888}

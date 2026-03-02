@@ -376,6 +376,44 @@ REGLAS:
 PROMPT
 );
 
+define('PROMPT_RESTRUCTURE', <<<'PROMPT'
+Actúa como diseñador instruccional experto en e-learning. Reestructura el siguiente texto de una unidad didáctica para optimizar su conversión a un curso SCORM 1.2 interactivo.
+
+UNIDAD: {unit_title} (numerada como {unit_number})
+
+TEXTO ORIGINAL:
+{unit_content}
+
+REGLAS ESTRICTAS:
+1. MANTENER la numeración original: si la unidad es {unit_number}, las secciones deben ser {unit_number}.1., {unit_number}.2., etc. y las subsecciones {unit_number}.1.a., {unit_number}.1.b., etc.
+2. NO perder información: todo el contenido original debe aparecer en la salida
+3. NO inventar contenido nuevo ni añadir datos que no estén en el original
+4. NO cambiar el número de la unidad: sigue siendo TEMA {unit_number}
+
+REESTRUCTURACIÓN:
+- Párrafos: máximo 3-4 frases cada uno. Dividir párrafos largos.
+- Definiciones: convertir a formato "Término: Definición completa." cuando detectes que se define un concepto.
+- Listas: agrupar elementos relacionados en listas con viñetas (•).
+- Tablas: si hay datos tabulares o comparaciones, presentarlos como tabla con | separador y primera fila como cabecera.
+- Procedimientos: si hay pasos secuenciales, numerarlos (1., 2., 3.).
+- Advertencias: si hay información crítica o de seguridad, marcarla con "IMPORTANTE:" al inicio.
+- Secciones: organizar el contenido en secciones claras con formato {unit_number}.X. Título
+
+FORMATO DE SALIDA:
+Devuelve SOLO el texto reestructurado en texto plano (NO JSON, NO markdown con backticks). Mantén la estructura jerárquica:
+
+TEMA {unit_number}: {unit_title}
+
+{unit_number}.1. Primera sección
+[contenido reestructurado]
+
+{unit_number}.2. Segunda sección
+[contenido reestructurado]
+
+etc.
+PROMPT
+);
+
 // =============================================
 // FUNCIONES AUXILIARES
 // =============================================

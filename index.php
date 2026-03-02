@@ -231,14 +231,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             </div>
             <hr class="divider">
-            <h3 class="section-title">Plantilla de estilo</h3>
-            <div class="templates-grid" id="templates-grid"><div class="template-loading">Cargando plantillas...</div></div>
-            <div class="template-actions">
-                <label class="btn btn-ghost btn-sm" for="template-import-input">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    Importar plantilla
-                </label>
-                <input type="file" id="template-import-input" accept=".zip" hidden>
+            <h3 class="section-title">Tema visual</h3>
+            <div class="templates-grid" id="templates-grid"><div class="template-loading">Cargando temas...</div></div>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-create-theme" onclick="toggleCreateTheme()">+ Crear tema</button>
+            <div id="create-theme-form" class="create-theme-form hidden">
+                <div class="form-grid">
+                    <div class="form-group"><label for="theme-name">Nombre</label><input type="text" id="theme-name" placeholder="Ej: Mi empresa"></div>
+                    <div class="form-group"><label for="theme-primary">Color principal</label><input type="color" id="theme-primary" value="#143554"></div>
+                    <div class="form-group"><label for="theme-accent">Color acento</label><input type="color" id="theme-accent" value="#F05726"></div>
+                    <div class="form-group"><label for="theme-logo">Logo (opcional)</label><input type="file" id="theme-logo" accept=".png,.jpg,.jpeg,.svg"></div>
+                </div>
+                <div class="btn-group" style="margin-top:.75rem">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="toggleCreateTheme()">Cancelar</button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="createTheme()">Guardar tema</button>
+                </div>
             </div>
             <div class="btn-group">
                 <button class="btn btn-ghost" onclick="goToStep(1)">Volver</button>
@@ -264,7 +270,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 <h2 class="card-title">Paquete generado</h2>
                 <p class="card-desc">Listo para importar en Moodle u otro LMS compatible con SCORM 1.2</p>
                 <div class="summary-grid" id="final-stats"></div>
-                <button class="btn btn-accent btn-lg btn-full" id="btn-download"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Descargar SCORM</button>
+                <div class="download-buttons">
+                    <button class="btn btn-accent btn-lg btn-full" id="btn-download"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Descargar SCORM</button>
+                    <button class="btn btn-primary-outline btn-lg btn-full" id="btn-download-pdf"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Descargar PDF</button>
+                </div>
                 <button class="btn btn-ghost btn-full mt-3" onclick="resetApp()">Convertir otro documento</button>
             </div>
         </section>

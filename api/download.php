@@ -1,7 +1,7 @@
 <?php
 /**
- * API: Descargar paquete SCORM
- * GET /api/download.php?id=xxx
+ * API: Descargar paquete SCORM o PDF
+ * GET /api/download.php?id=xxx&format=zip|pdf
  */
 
 require_once __DIR__ . '/../config.php';
@@ -22,7 +22,10 @@ if (empty($downloadId) || !preg_match('/^scorm_[a-f0-9.]+$/i', $downloadId)) {
     die('ID de descarga inválido');
 }
 
-$filePath = TEMP_PATH . '/download_' . $downloadId . '.zip';
+// Detectar formato (zip o pdf)
+$format = $_GET['format'] ?? 'zip';
+$ext = ($format === 'pdf') ? '.pdf' : '.zip';
+$filePath = TEMP_PATH . '/download_' . $downloadId . $ext;
 
 if (!file_exists($filePath)) {
     http_response_code(404);
@@ -30,11 +33,13 @@ if (!file_exists($filePath)) {
 }
 
 // Obtener nombre del archivo desde query string o usar genérico
-$filename = $_GET['filename'] ?? 'SCORM_Package.zip';
+$defaultName = ($format === 'pdf') ? 'Manual.pdf' : 'SCORM_Package.zip';
+$filename = $_GET['filename'] ?? $defaultName;
 $filename = preg_replace('/[^a-zA-Z0-9_\-.]/', '', $filename);
 
-// Enviar archivo
-header('Content-Type: application/zip');
+// Enviar archivo con Content-Type correcto
+$mimeType = ($format === 'pdf') ? 'application/pdf' : 'application/zip';
+header('Content-Type: ' . $mimeType);
 header('Content-Disposition: attachment; filename="' . $filename . '"');
 header('Content-Length: ' . filesize($filePath));
 header('Cache-Control: no-cache, must-revalidate');

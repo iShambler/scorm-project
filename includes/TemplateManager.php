@@ -361,4 +361,192 @@ class TemplateManager
         }
         rmdir($dir);
     }
+
+    // ── TEMAS DE USUARIO (BD) ──
+
+    /**
+     * Devuelve temas creados por un usuario
+     */
+    public function getUserThemes(\PDO $db, int $userId): array
+    {
+        $stmt = $db->prepare("SELECT * FROM `user_themes` WHERE `user_id` = ? ORDER BY `created_at` DESC");
+        $stmt->execute([$userId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Devuelve todos los temas (para admin)
+     */
+    public function getAllUserThemes(\PDO $db): array
+    {
+        $stmt = $db->query("
+            SELECT t.*, u.username
+            FROM `user_themes` t
+            JOIN `users` u ON t.user_id = u.id
+            ORDER BY t.created_at DESC
+        ");
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Crea un tema de usuario
+     */
+    public function createUserTheme(\PDO $db, int $userId, string $name, string $primary, string $accent, ?string $logoFilename = null): ?array
+    {
+        $name = trim($name);
+        if (empty($name)) return null;
+        if (!preg_match('/^#[0-9a-fA-F]{6}$/', $primary)) return null;
+        if (!preg_match('/^#[0-9a-fA-F]{6}$/', $accent)) return null;
+
+        $stmt = $db->prepare("
+            INSERT INTO `user_themes` (`user_id`, `name`, `color_primary`, `color_accent`, `logo_filename`)
+            VALUES (?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([$userId, $name, $primary, $accent, $logoFilename]);
+
+        $id = (int)$db->lastInsertId();
+        return $this->getUserThemeById($db, $id);
+    }
+
+    /**
+     * Obtiene un tema por ID
+     */
+    public function getUserThemeById(\PDO $db, int $themeId): ?array
+    {
+        $stmt = $db->prepare("SELECT * FROM `user_themes` WHERE `id` = ?");
+        $stmt->execute([$themeId]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    /**
+     * Elimina un tema (solo si pertenece al usuario, o si es admin)
+     */
+    public function deleteUserTheme(\PDO $db, int $themeId, int $userId, bool $isAdmin = false): bool
+    {
+        if ($isAdmin) {
+            $stmt = $db->prepare("DELETE FROM `user_themes` WHERE `id` = ?");
+            $stmt->execute([$themeId]);
+        } else {
+            $stmt = $db->prepare("DELETE FROM `user_themes` WHERE `id` = ? AND `user_id` = ?");
+            $stmt->execute([$themeId, $userId]);
+        }
+
+        return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * Actualiza un tema existente (solo si pertenece al usuario, o si es admin)
+     */
+    public function updateUserTheme(\PDO $db, int $themeId, int $userId, string $name, string $primary, string $accent, ?string $logoFilename = null, bool $isAdmin = false): ?array
+    {
+        $name = trim($name);
+        if (empty($name)) return null;
+        if (!preg_match('/^#[0-9a-fA-F]{6}$/', $primary)) return null;
+        if (!preg_match('/^#[0-9a-fA-F]{6}$/', $accent)) return null;
+
+        // Verificar propiedad
+        $existing = $this->getUserThemeById($db, $themeId);
+        if (!$existing) return null;
+        if (!$isAdmin && (int)$existing['user_id'] !== $userId) return null;
+
+        $sql = "UPDATE `user_themes` SET `name` = ?, `color_primary` = ?, `color_accent` = ?";
+        $params = [$name, $primary, $accent];
+
+        if ($logoFilename !== null) {
+            $sql .= ", `logo_filename` = ?";
+            $params[] = $logoFilename;
+        }
+
+        $sql .= " WHERE `id` = ?";
+        $params[] = $themeId;
+
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+
+        return $this->getUserThemeById($db, $themeId);
+    }
+
+    /**
+     * Genera CSS con variables inyectadas a partir de 2 colores
+     * El secondary se autocalcula (primary más claro)
+     */
+    public function buildCSSFromColors(string $primary, string $accent): string
+    {
+        $secondary = $this->lightenColor($primary, 20);
+
+        // Cargar CSS base de arelance-corporate
+        $tpl = $this->loadTemplate($this->defaultTemplate);
+        $baseCss = $tpl['css'] ?? '';
+        $fonts = $tpl['fonts'] ?? [];
+        $settings = $tpl['settings'] ?? [];
+
+        $fontsUrl = $settings['google_fonts_url'] ?? '';
+        $fontImport = !empty($fontsUrl) ? "@import url('{$fontsUrl}');\n" : '';
+
+        $vars = ":root{\n";
+        $vars .= "  --primary:{$primary};\n";
+        $vars .= "  --secondary:{$secondary};\n";
+        $vars .= "  --accent:{$accent};\n";
+        $vars .= "  --bg:#f8f9fa;\n";
+        $vars .= "  --card:#ffffff;\n";
+        $vars .= "  --text:#333333;\n";
+        $vars .= "  --text-light:#666666;\n";
+        $vars .= "  --border:#e0e0e0;\n";
+        $vars .= "  --success:#22c55e;\n";
+        $vars .= "  --danger:#ef4444;\n";
+        $vars .= "  --warning:#f59e0b;\n";
+        $vars .= "  --radius:" . ($settings['radius'] ?? '12px') . ";\n";
+        $vars .= "  --shadow:0 4px 20px rgba(0,0,0,.08);\n";
+        $vars .= "  --font-heading:'" . ($fonts['heading'] ?? 'Poppins') . "';\n";
+        $vars .= "  --font-body:'" . ($fonts['body'] ?? 'Inter') . "';\n";
+        $vars .= "  --font-code:'" . ($fonts['code'] ?? 'Fira Code') . "';\n";
+        $vars .= "}\n";
+
+        return $fontImport . $vars . "\n" . $baseCss;
+    }
+
+    /**
+     * Copia el logo de un tema de usuario al directorio del SCORM
+     */
+    public function copyUserThemeLogo(?string $logoFilename, string $destDir): array
+    {
+        $copied = [];
+        if (empty($logoFilename)) {
+            logError("DEBUG copyUserThemeLogo: logo_filename is empty/null");
+            return $copied;
+        }
+
+        $logoSrc = (defined('UPLOAD_PATH') ? UPLOAD_PATH : __DIR__ . '/../uploads') . '/logos/' . $logoFilename;
+        logError("DEBUG copyUserThemeLogo: checking file at {$logoSrc}, exists=" . (file_exists($logoSrc) ? 'YES' : 'NO'));
+        if (!file_exists($logoSrc)) return $copied;
+
+        $destAssets = $destDir . '/img';
+        if (!is_dir($destAssets)) @mkdir($destAssets, 0755, true);
+
+        $ok = copy($logoSrc, $destAssets . '/' . $logoFilename);
+        logError("DEBUG copyUserThemeLogo: copy result=" . ($ok ? 'OK' : 'FAIL') . ", dest={$destAssets}/{$logoFilename}");
+        $copied['logo'] = 'img/' . $logoFilename;
+
+        return $copied;
+    }
+
+    /**
+     * Aclara un color hex un porcentaje dado
+     */
+    private function lightenColor(string $hex, float $percent): string
+    {
+        $hex = ltrim($hex, '#');
+        $r = hexdec(substr($hex, 0, 2));
+        $g = hexdec(substr($hex, 2, 2));
+        $b = hexdec(substr($hex, 4, 2));
+
+        $r = min(255, (int)($r + (255 - $r) * $percent / 100));
+        $g = min(255, (int)($g + (255 - $g) * $percent / 100));
+        $b = min(255, (int)($b + (255 - $b) * $percent / 100));
+
+        return '#' . str_pad(dechex($r), 2, '0', STR_PAD_LEFT)
+                    . str_pad(dechex($g), 2, '0', STR_PAD_LEFT)
+                    . str_pad(dechex($b), 2, '0', STR_PAD_LEFT);
+    }
 }

@@ -29,6 +29,11 @@ class Auth
         ]);
     }
 
+    public function getDb(): \PDO
+    {
+        return $this->db;
+    }
+
     /**
      * Crea la tabla users si no existe
      */
@@ -41,6 +46,18 @@ class Auth
                 `password_hash` VARCHAR(255) NOT NULL,
                 `role`          ENUM('admin','user') NOT NULL DEFAULT 'user',
                 `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+        $this->db->exec("
+            CREATE TABLE IF NOT EXISTS `user_themes` (
+                `id`             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                `user_id`        INT UNSIGNED NOT NULL,
+                `name`           VARCHAR(100) NOT NULL,
+                `color_primary`  VARCHAR(7) NOT NULL DEFAULT '#143554',
+                `color_accent`   VARCHAR(7) NOT NULL DEFAULT '#F05726',
+                `logo_filename`  VARCHAR(255) DEFAULT NULL,
+                `created_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
     }
