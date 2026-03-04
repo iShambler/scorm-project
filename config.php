@@ -220,6 +220,7 @@ COMPONENTES DISPONIBLES (usa variedad, nunca más de 2 párrafos seguidos):
 - "tabla": datos comparativos. Campo "filas", primera fila = cabecera
 - "comparativa": 2-4 elementos en TABS interactivas ("items" formato "Nombre: descripción")
 - "proceso": pasos en ACORDEÓN desplegable. Úsalo siempre que el contenido tenga ítems con cierto orden o estructura interna: (1) procedimientos paso a paso secuenciales, (2) protocolos o fases de actuación numeradas, (3) escalas de valoración o criterios de evaluación con ítems ordenados, (4) algoritmos de decisión con pasos definidos. NUNCA para simples listas de conceptos sin orden ni estructura interna.
+  FORMATO OBLIGATORIO de cada item de "proceso": "Título corto (3-6 palabras): explicación detallada completa". El título corto es lo que se muestra en la cabecera del acordeón; la explicación se muestra al expandir. Ejemplo correcto: "Inclusión inicial: Una vez identificado el paciente e incluido en el Proceso Asistencial, en un plazo de un mes". Ejemplo incorrecto: "Una vez identificado el paciente e incluido en el Proceso Asistencial en un plazo de un mes" (sin título corto).
 - "importante": caja amarilla de advertencia
 - "sabias_que": caja verde de dato complementario
 - "ejemplo": caja con caso práctico
@@ -261,6 +262,8 @@ REGLAS DE DISEÑO:
 
 1. VARIEDAD VISUAL: Alterna tipos de bloque. Nunca más de 2 "parrafo" seguidos.
    Patrón ideal: parrafo → tabla → sabias_que → lista → parrafo...
+
+   REGLA OBLIGATORIA PARA LISTAS: Toda "lista" DEBE ir precedida de un bloque "parrafo" cuya ÚLTIMA frase introduzca directamente los items (debe terminar con ":" o con una frase tipo "son los siguientes:", "se incluyen:", "se destacan:", etc.). NO basta con que haya un párrafo antes hablando del tema — ese párrafo debe ACABAR presentando la lista. Si el contenido original no tiene frase introductoria, créala a partir del contexto (ej: "Las áreas que evalúa la Escala de Gijón son:").
 
 2. COMPONENTES INTERACTIVOS: Usa estos siempre que el contenido lo permita:
    - Dos cosas que comparar → "comparativa" (genera tabs clicables)
@@ -416,6 +419,73 @@ TEMA {unit_number}: {unit_title}
 etc.
 PROMPT
 );
+
+// Prompt para clasificar y convertir imágenes del Word a bloques estructurados (Vision API)
+define('PROMPT_CLASSIFY_IMAGE', <<<'PROMPT'
+Eres un experto en diseño instruccional para e-learning. Analiza esta imagen de un documento educativo y conviértela en contenido HTML estructurado.
+{language_instruction}
+
+CONTEXTO del documento donde aparece la imagen:
+{context}
+
+PASO 1 — CLASIFICA la imagen en UNA de estas categorías:
+- TABLA_CLINICA: tabla con datos, escalas, puntuaciones, criterios, clasificaciones
+- ALGORITMO: diagrama de flujo, árbol de decisión, flujograma con pasos secuenciales
+- ESQUEMA: mapa conceptual, diagrama de relaciones, esquema jerárquico, infografía
+- FORMULARIO: formulario, ficha de registro, plantilla a rellenar
+- GRAFICO: gráfico estadístico (barras, líneas, circular, dispersión)
+- DECORATIVA: foto decorativa, ilustración genérica, logo, icono sin información educativa
+
+PASO 2 — CONVIERTE el contenido de la imagen en bloques estructurados.
+
+Responde ÚNICAMENTE con JSON válido (sin markdown, sin ```):
+{
+    "clasificacion": "TABLA_CLINICA|ALGORITMO|ESQUEMA|FORMULARIO|GRAFICO|DECORATIVA",
+    "confianza": 0.0-1.0,
+    "descripcion_breve": "descripción de 1 línea de lo que muestra la imagen",
+    "bloques": []
+}
+
+REGLAS DE CONVERSIÓN POR CATEGORÍA:
+
+TABLA_CLINICA → tipo "tabla":
+{"tipo": "tabla", "filas": [["Columna1", "Columna2"], ["dato1", "dato2"]]}
+- Transcribe TODAS las filas y columnas visibles.
+- Si hay valores numéricos (puntuaciones, rangos), inclúyelos exactos.
+- Si un valor no es legible con certeza, escríbelo seguido de " [VERIFICAR]".
+
+ALGORITMO → tipo "proceso":
+{"tipo": "proceso", "items": ["Paso 1: descripción completa", "Paso 2: si X entonces Y"]}
+- Convierte cada nodo/decisión del diagrama en un paso.
+- Para bifurcaciones: "Si [condición] → [resultado A]. Si no → [resultado B]"
+
+ESQUEMA → combinación de bloques:
+- Si es jerárquico: {"tipo": "lista", "titulo": "Concepto central", "items": ["Subcategoría 1: detalle", "Subcategoría 2: detalle"]}
+- Si tiene categorías con descripciones: {"tipo": "tabla", "filas": [["Concepto", "Descripción"], ...]}
+
+FORMULARIO → tipo "tabla":
+{"tipo": "tabla", "filas": [["Campo", "Descripción/Instrucción"], ["Nombre", "Introducir nombre completo"]]}
+- Transcribe cada campo del formulario como fila.
+
+GRAFICO → tipo "tabla" + "parrafo":
+[
+    {"tipo": "parrafo", "texto": "Descripción del gráfico: qué muestra, tendencia principal, conclusión"},
+    {"tipo": "tabla", "filas": [["Categoría", "Valor"], ["dato1", "valor1"]]}
+]
+
+DECORATIVA → bloques vacío:
+{"clasificacion": "DECORATIVA", "confianza": 1.0, "descripcion_breve": "...", "bloques": []}
+
+REGLAS CRÍTICAS:
+1. FIDELIDAD: Transcribe TODO lo visible. No inventes datos.
+2. VERIFICAR: Si un dato no es 100% legible, añade " [VERIFICAR]" después.
+3. CONTEXTO: Usa el contexto del documento para entender la imagen.
+4. IDIOMA: Contenido de salida en el mismo idioma que el contexto.
+5. Si la imagen está en baja resolución y no puedes extraer info útil, clasifícala como DECORATIVA.
+PROMPT
+);
+
+define('MAX_IMAGE_SIZE_VISION', 5242880); // 5MB máximo por imagen para Vision API
 
 // =============================================
 // FUNCIONES AUXILIARES

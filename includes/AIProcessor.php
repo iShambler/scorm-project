@@ -205,6 +205,95 @@ PROMPT;
     }
     
     /**
+     * Clasifica una imagen del documento y la convierte en bloques estructurados.
+     * Usa Claude Vision API para analizar el contenido visual.
+     *
+     * @param array  $imageData Datos de la imagen (de WordProcessor::getImages())
+     * @param string $context   Texto circundante del documento
+     * @return array {clasificacion, confianza, descripcion_breve, bloques[]}
+     */
+    public function classifyImage(array $imageData, string $context = ''): array
+    {
+        $base64 = base64_encode($imageData['data']);
+        $mime = $imageData['mime'];
+
+        $prompt = PROMPT_CLASSIFY_IMAGE;
+        $prompt = str_replace('{context}', $this->truncateContent($context, 2000), $prompt);
+        $prompt = str_replace('{language_instruction}', $this->getLanguageInstruction(), $prompt);
+
+        $response = $this->callVisionAPI($base64, $mime, $prompt);
+        return $this->parseJsonResponse($response);
+    }
+
+    /**
+     * Llama a Claude Vision API con imagen + texto (multimodal)
+     */
+    private function callVisionAPI(string $base64Image, string $mimeType, string $prompt): string
+    {
+        $data = [
+            'model' => $this->model,
+            'max_tokens' => 8000,
+            'messages' => [
+                [
+                    'role' => 'user',
+                    'content' => [
+                        [
+                            'type' => 'image',
+                            'source' => [
+                                'type' => 'base64',
+                                'media_type' => $mimeType,
+                                'data' => $base64Image
+                            ]
+                        ],
+                        [
+                            'type' => 'text',
+                            'text' => $prompt
+                        ]
+                    ]
+                ]
+            ]
+        ];
+
+        $ch = curl_init($this->apiUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'x-api-key: ' . $this->apiKey,
+                'anthropic-version: 2023-06-01'
+            ],
+            CURLOPT_POSTFIELDS => json_encode($data),
+            CURLOPT_TIMEOUT => 120,
+            CURLOPT_SSL_VERIFYPEER => true
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($error) {
+            logError("Vision API cURL error: {$error}");
+            throw new \Exception("Error de conexión Vision API: {$error}");
+        }
+
+        if ($httpCode !== 200) {
+            $errorData = json_decode($response, true);
+            $errorMsg = $errorData['error']['message'] ?? "Error HTTP {$httpCode}";
+            logError("Vision API error: {$errorMsg}", ['response' => substr($response, 0, 500)]);
+            throw new \Exception("Error Vision API: {$errorMsg}");
+        }
+
+        $responseData = json_decode($response, true);
+        if (!isset($responseData['content'][0]['text'])) {
+            throw new \Exception("Respuesta Vision API inválida");
+        }
+
+        return $responseData['content'][0]['text'];
+    }
+
+    /**
      * Llama a la API de Claude
      */
     private function callAPI(string $prompt): string

@@ -26,6 +26,7 @@ class SCORMGenerator
 
     private array $templateData;
     private int $accCounter = 0;  // contador global de acordeones por unidad (evita IDs duplicados)
+    private int $tabCounter = 0;  // contador global de tabs por unidad (evita IDs duplicados)
 
     public function __construct(array $moduleConfig, array $units, array $images = [], string $templateId = 'arelance-corporate', string $language = 'es')
     {
@@ -118,6 +119,7 @@ class SCORMGenerator
     private function buildUnitHTML(array $unit, int $idx, int $totalUnits): string
     {
         $this->accCounter = 0;  // resetear IDs de acordeón para cada unidad
+        $this->tabCounter = 0;  // resetear IDs de tabs para cada unidad
         $mod   = $this->e($this->moduleConfig['titulo']);
         $cod   = $this->e($this->moduleConfig['codigo']);
         $emp   = $this->e($this->moduleConfig['empresa'] ?? DEFAULT_COMPANY);
@@ -605,7 +607,6 @@ class SCORMGenerator
     private function renderBlocks(array $bloques): string
     {
         $html = '';
-        $tabN = 0;
 
         foreach ($bloques as $b) {
             $tipo = $b['tipo'] ?? 'parrafo';
@@ -635,7 +636,7 @@ class SCORMGenerator
                     break;
 
                 case 'comparativa':
-                    $tid = 'tabs' . ($tabN++);
+                    $tid = 'tabs' . ($this->tabCounter++);
                     $html .= '<div class="tabs-container" id="' . $tid . '"><div class="tabs-nav">';
                     foreach ($items as $ti => $item) {
                         $parts = explode(':', $item, 2);
@@ -658,20 +659,33 @@ class SCORMGenerator
                     $html .= '<div class="accordion-container">';
                     foreach ($items as $pi => $paso) {
                         $cid = $aid . 'p' . $pi;
-                        // Quitar prefijo "Paso N." o "N." del texto para extraer título real
-                        $workText = preg_replace('/^(?:Paso\s*\d+\s*[.:]\s*|\d+\s*[.:]\s*)/u', '', $paso);
+                        // Quitar prefijos numéricos comunes
+                        $workText = preg_replace('/^(?:Paso\s*\d+\s*[.:]\s*|\d+\s*[.:]\s*|Situaci[oó]n\s*\d+\s*[.:]\s*|Criterio\s*\d+\s*[.:]\s*|Fase\s*\d+\s*[.:]\s*)/ui', '', $paso);
+                        // Formato esperado: "Título corto: explicación detallada"
                         $colonPos = mb_strpos($workText, ':');
-                        $dotPos   = mb_strpos($workText, '. ');
-                        $titleEnd = 60;
-                        if ($colonPos !== false && $colonPos < 60) $titleEnd = $colonPos;
-                        elseif ($dotPos !== false && $dotPos < 60) $titleEnd = $dotPos;
-                        $accTitle = mb_substr($workText, 0, $titleEnd);
-                        if (mb_strlen($workText) > mb_strlen($accTitle)) $accTitle .= '...';
+                        if ($colonPos !== false && $colonPos <= 80) {
+                            $accTitle = mb_substr($workText, 0, $colonPos);
+                            $accBody = trim(mb_substr($workText, $colonPos + 1));
+                        } else {
+                            // Fallback: primera frase como título
+                            $dotPos = mb_strpos($workText, '. ');
+                            if ($dotPos !== false && $dotPos < 100) {
+                                $accTitle = mb_substr($workText, 0, $dotPos);
+                            } elseif (mb_strlen($workText) > 80) {
+                                $accTitle = mb_substr($workText, 0, 80);
+                                $lastSpace = mb_strrpos($accTitle, ' ');
+                                if ($lastSpace > 40) $accTitle = mb_substr($accTitle, 0, $lastSpace);
+                                $accTitle .= '...';
+                            } else {
+                                $accTitle = $workText;
+                            }
+                            $accBody = $workText;
+                        }
                         $html .= '<div class="accordion-item">'
                             . '<div class="accordion-header" onclick="toggleAccordion(\'' . $cid . '\')">'
                             . '<span class="acc-title">' . Lang::get('step') . ' ' . ($pi + 1) . ': ' . $this->e($accTitle) . '</span>'
                             . '<span class="accordion-arrow">&#8594;</span></div>'
-                            . '<div class="accordion-body" id="' . $cid . '"><p>' . $this->e($paso) . '</p></div></div>';
+                            . '<div class="accordion-body" id="' . $cid . '"><p>' . $this->e($accBody) . '</p></div></div>';
                     }
                     $html .= '</div>';
                     break;
@@ -935,7 +949,7 @@ prevs.forEach(function(b){b.addEventListener('click',function(){var c=this.close
 if(wells.length>0){wells[0].style.display='block';mark(wells[0])}
 function mark(el){var id=el.getAttribute('id');if(!id||done.indexOf(id)!==-1)return;done.push(id);pct+=parseFloat(step);if(pct>=100){pct=100;try{parent.guardarPuntuacion(pct);parent.marcarFinalizado()}catch(e){}}else{try{parent.guardarPuntuacion(pct)}catch(e){}}}
 });
-function toggleAccordion(id){var e=document.getElementById(id);if(!e)return;var o=e.style.display==='block';e.style.display=o?'none':'block';var h=e.previousElementSibling;if(h)h.classList.toggle('open',!o)}
+function toggleAccordion(id){var e=document.getElementById(id);if(!e)return;var o=e.style.display==='block';var container=e.closest('.accordion-container');if(container){container.querySelectorAll('.accordion-body').forEach(function(b){if(b!==e){b.style.display='none';var bh=b.previousElementSibling;if(bh)bh.classList.remove('open')}})}e.style.display=o?'none':'block';var h=e.previousElementSibling;if(h)h.classList.toggle('open',!o)}
 (function(){var dr=null;
 document.addEventListener('dragstart',function(e){if(!e.target.classList.contains('matching-def'))return;dr=e.target;e.target.classList.add('dragging');e.dataTransfer.effectAllowed='move'});
 document.addEventListener('dragend',function(e){if(e.target.classList.contains('matching-def'))e.target.classList.remove('dragging');document.querySelectorAll('.matching-dropzone').forEach(function(z){z.classList.remove('drag-over')})});

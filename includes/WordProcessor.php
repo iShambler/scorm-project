@@ -18,6 +18,7 @@ class WordProcessor
     private array $styles = [];
     private array $relationships = [];  // rId -> target path
     private array $images = [];         // extracted images: [{filename, data, mime, rId}]
+    private array $imagePositions = []; // posición de cada imagen en el documento
     
     public function __construct(string $filePath)
     {
@@ -116,7 +117,36 @@ class WordProcessor
                 if ($nodeName === 'p') {
                     $text = $this->extractTextFromNode($node);
                     $style = $this->detectParagraphStyle($node);
-                    
+
+                    // Detectar imágenes embebidas en este párrafo
+                    $drawings = $node->getElementsByTagName('drawing');
+                    if ($drawings->length > 0) {
+                        foreach ($drawings as $drawing) {
+                            $rId = $this->extractImageRId($drawing);
+                            if ($rId && isset($this->relationships[$rId])) {
+                                $filename = basename($this->relationships[$rId]);
+                                $this->imagePositions[] = [
+                                    'rId' => $rId,
+                                    'paragraph_index' => count($this->paragraphs),
+                                    'preceding_text' => trim($text),
+                                    'filename' => $filename
+                                ];
+                                // Si el párrafo solo contiene imagen (sin texto), insertar placeholder
+                                if (empty(trim($text))) {
+                                    $placeholder = '[IMAGEN: ' . $filename . ']';
+                                    $this->paragraphs[] = [
+                                        'text' => $placeholder,
+                                        'style' => 'ImagePlaceholder',
+                                        'is_heading' => false,
+                                        'is_list' => false,
+                                        'image_rId' => $rId
+                                    ];
+                                    $currentText[] = $placeholder;
+                                }
+                            }
+                        }
+                    }
+
                     if (!empty(trim($text))) {
                         $this->paragraphs[] = [
                             'text' => trim($text),
@@ -543,13 +573,7 @@ class WordProcessor
                 // Filtrar iconos pequeños (< 100px en alguna dimensión)
                 if ($w < 100 || $h < 100) continue;
 
-                // Filtrar imágenes de texto: muy anchas respecto a su alto
-                // (capturas de texto, tablas, diagramas tipo captura)
                 $ratio = $w / max($h, 1);
-                if ($ratio > 4) continue; // Ej: 1200x200 = ratio 6 -> es texto
-
-                // Filtrar imágenes muy altas y estrechas (barras laterales, etc)
-                if ($h / max($w, 1) > 4) continue;
 
                 $rId = array_search('media/' . $filename, $this->relationships);
                 $this->images[] = [
@@ -560,7 +584,8 @@ class WordProcessor
                     'size' => strlen($data),
                     'width' => $w,
                     'height' => $h,
-                    'path_in_zip' => $name
+                    'path_in_zip' => $name,
+                    'aspect_ratio' => round($ratio, 2)
                 ];
             }
         }
@@ -790,6 +815,44 @@ class WordProcessor
             $lines[] = '';
         }
         return implode("\n", $lines);
+    }
+
+    /**
+     * Extrae el rId de un nodo <drawing>.
+     * Tras strip de namespaces: drawing > inline/anchor > graphic > graphicData > pic > blipFill > blip[@embed]
+     */
+    private function extractImageRId($drawingNode): ?string
+    {
+        $blips = $drawingNode->getElementsByTagName('blip');
+        if ($blips->length > 0) {
+            $embed = $blips->item(0)->getAttribute('embed');
+            if (!empty($embed)) {
+                return $embed;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Devuelve imágenes con su posición en el documento.
+     * Solo incluye imágenes que pasaron los filtros de extractImages().
+     */
+    public function getImagePositions(): array
+    {
+        $imageByFilename = [];
+        foreach ($this->images as $img) {
+            $imageByFilename[$img['filename']] = $img;
+        }
+
+        $result = [];
+        foreach ($this->imagePositions as $pos) {
+            if (isset($imageByFilename[$pos['filename']])) {
+                $result[] = array_merge($pos, [
+                    'image' => $imageByFilename[$pos['filename']]
+                ]);
+            }
+        }
+        return $result;
     }
 
     /**

@@ -117,6 +117,85 @@ try {
             logError('DEBUG outline: ' . count($outline['units']) . ' units detected, module="' . $outline['module_title'] . '"');
 
             // ============================================================
+            // VISION: Clasificar y convertir imágenes del Word
+            // Se procesan antes de la reestructuración para que el contenido
+            // convertido se inyecte en el texto que la IA reorganizará
+            // ============================================================
+            $convertedImageBlocks = [];
+            $imagePositions = $wordProcessor->getImagePositions();
+
+            if (!empty($imagePositions)) {
+                logError('DEBUG vision: ' . count($imagePositions) . ' positioned images to process');
+                $allParagraphs = $wordProcessor->getParagraphs();
+
+                foreach ($imagePositions as $imgPos) {
+                    $img = $imgPos['image'];
+
+                    // Saltar imágenes muy grandes para la API
+                    if ($img['size'] > MAX_IMAGE_SIZE_VISION) {
+                        logError('DEBUG vision: ' . $img['filename'] . ' skipped (too large: ' . $img['size'] . 'B)');
+                        continue;
+                    }
+
+                    // Construir contexto: 2 párrafos antes + 2 después
+                    $paraIdx = $imgPos['paragraph_index'];
+                    $contextParts = [];
+                    for ($ci = max(0, $paraIdx - 2); $ci < $paraIdx; $ci++) {
+                        if (isset($allParagraphs[$ci]) && ($allParagraphs[$ci]['style'] ?? '') !== 'ImagePlaceholder') {
+                            $contextParts[] = $allParagraphs[$ci]['text'];
+                        }
+                    }
+                    for ($ci = $paraIdx + 1; $ci <= min(count($allParagraphs) - 1, $paraIdx + 2); $ci++) {
+                        if (isset($allParagraphs[$ci]) && ($allParagraphs[$ci]['style'] ?? '') !== 'ImagePlaceholder') {
+                            $contextParts[] = $allParagraphs[$ci]['text'];
+                        }
+                    }
+                    $context = implode("\n", $contextParts);
+
+                    logError('DEBUG vision: classifying ' . $img['filename'] . ' (' . $img['width'] . 'x' . $img['height'] . ', ' . $img['size'] . 'B)');
+
+                    try {
+                        $classification = $aiProcessor->classifyImage($img, $context);
+
+                        if (($classification['clasificacion'] ?? '') === 'DECORATIVA') {
+                            logError('DEBUG vision: ' . $img['filename'] . ' = DECORATIVA (skipped)');
+                            continue;
+                        }
+
+                        $convertedImageBlocks[$img['filename']] = [
+                            'clasificacion' => $classification['clasificacion'] ?? 'DESCONOCIDA',
+                            'confianza' => $classification['confianza'] ?? 0.5,
+                            'descripcion' => $classification['descripcion_breve'] ?? '',
+                            'bloques' => $classification['bloques'] ?? [],
+                            'paragraph_index' => $paraIdx
+                        ];
+
+                        logError('DEBUG vision: ' . $img['filename'] . ' = ' . ($classification['clasificacion'] ?? '?')
+                            . ' (confianza: ' . ($classification['confianza'] ?? '?')
+                            . ', bloques: ' . count($classification['bloques'] ?? []) . ')');
+
+                    } catch (\Exception $ve) {
+                        logError('Error vision ' . $img['filename'] . ': ' . $ve->getMessage());
+                    }
+                }
+            }
+
+            // Inyectar bloques convertidos en el outline (reemplazar placeholders [IMAGEN: x])
+            if (!empty($convertedImageBlocks)) {
+                logError('DEBUG vision: injecting ' . count($convertedImageBlocks) . ' converted images into outline');
+                foreach ($outline['units'] as &$ou) {
+                    $ou['content'] = injectImageBlocksIntoContent($ou['content'] ?? [], $convertedImageBlocks);
+                    foreach ($ou['sections'] as &$sec) {
+                        $sec['content'] = injectImageBlocksIntoContent($sec['content'] ?? [], $convertedImageBlocks);
+                        foreach ($sec['subsections'] as &$sub) {
+                            $sub['content'] = injectImageBlocksIntoContent($sub['content'] ?? [], $convertedImageBlocks);
+                        }
+                    }
+                }
+                unset($ou, $sec, $sub);
+            }
+
+            // ============================================================
             // REESTRUCTURACIÓN: La IA reorganiza el texto crudo de cada UD
             // antes del análisis. Mejora párrafos, definiciones, listas, etc.
             // Mantiene la numeración original del documento.
@@ -386,7 +465,9 @@ function buildBasicAnalysis(array $structure, array $documentData, array $codeBl
         
         foreach ($structure['units'] as $unit) {
             $unitContent = implode("\n\n", $unit['content'] ?? []);
-            
+            // Limpiar placeholders de imágenes (sin IA no se procesan)
+            $unitContent = preg_replace('/\[IMAGEN:\s*[^\]]+\]/', '', $unitContent);
+
             // Generar secciones reales a partir del contenido
             $secciones = buildSectionsFromContent($unitContent, $unit['title']);
             
@@ -818,4 +899,73 @@ function detectLanguage(string $text): string
 
     // Si no hay confianza suficiente, asumir español
     return ($scores[$best] >= 5) ? $best : 'es';
+}
+
+/**
+ * Reemplaza placeholders [IMAGEN: filename] en arrays de contenido
+ * con la representación textual de los bloques convertidos por Vision API
+ */
+function injectImageBlocksIntoContent(array $contentLines, array $convertedBlocks): array
+{
+    $result = [];
+    foreach ($contentLines as $line) {
+        if (preg_match('/^\[IMAGEN:\s*(.+?)\]$/', $line, $m)) {
+            $filename = trim($m[1]);
+            if (isset($convertedBlocks[$filename]) && !empty($convertedBlocks[$filename]['bloques'])) {
+                $result[] = '[Contenido extraído de imagen - ' . $convertedBlocks[$filename]['clasificacion'] . ']:';
+                foreach ($convertedBlocks[$filename]['bloques'] as $blk) {
+                    $text = blockToTextRepresentation($blk);
+                    if (!empty($text)) {
+                        $result[] = $text;
+                    }
+                }
+            }
+            // Si no hay conversión, se elimina el placeholder
+        } else {
+            $result[] = $line;
+        }
+    }
+    return $result;
+}
+
+/**
+ * Convierte un bloque estructurado (de Vision API) a texto legible
+ * para que la IA de reestructuración lo integre naturalmente
+ */
+function blockToTextRepresentation(array $block): string
+{
+    $tipo = $block['tipo'] ?? 'parrafo';
+    switch ($tipo) {
+        case 'tabla':
+            $rows = $block['filas'] ?? [];
+            if (empty($rows)) return '';
+            $lines = [];
+            foreach ($rows as $ri => $row) {
+                if ($ri === 0) {
+                    $lines[] = '[Tabla: ' . implode(' | ', $row) . ']';
+                } else {
+                    $lines[] = implode(' | ', $row);
+                }
+            }
+            return implode("\n", $lines);
+
+        case 'proceso':
+            $items = $block['items'] ?? [];
+            return implode("\n", array_map(function ($item, $i) {
+                return ($i + 1) . '. ' . $item;
+            }, $items, array_keys($items)));
+
+        case 'lista':
+            $title = !empty($block['titulo']) ? $block['titulo'] . ":\n" : '';
+            $items = $block['items'] ?? [];
+            return $title . implode("\n", array_map(function ($item) {
+                return '- ' . $item;
+            }, $items));
+
+        case 'definicion':
+            return ($block['termino'] ?? '') . ': ' . ($block['texto'] ?? $block['contenido'] ?? '');
+
+        default:
+            return $block['texto'] ?? $block['contenido'] ?? '';
+    }
 }
