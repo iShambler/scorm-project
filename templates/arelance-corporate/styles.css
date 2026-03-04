@@ -142,6 +142,10 @@ img{max-width:100%}.d-none{display:none!important}
 .lista_apte{list-style:none;padding:0;margin:1rem 0}
 .lista_apte li{padding:.5rem 0 .5rem 2rem;position:relative;border-bottom:1px solid #f0f0f0;font-size:.95rem;line-height:1.6}
 .lista_apte li::before{content:"";position:absolute;left:.5rem;top:.95rem;width:8px;height:8px;border-radius:50%;background:var(--accent);display:block}
+.btn-reveal{display:inline-flex;align-items:center;gap:.4rem;margin:.3rem 0 1rem .5rem;padding:.45rem 1.2rem;background:transparent;color:var(--primary);border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:.85rem;font-weight:500;transition:all .25s;font-family:var(--font-body,'Inter'),sans-serif}
+.btn-reveal:hover{background:var(--primary);color:#fff;border-color:var(--primary);transform:translateY(-1px);box-shadow:0 2px 8px rgba(20,53,84,.15)}
+.btn-reveal.completed{background:var(--success);color:#fff;border-color:var(--success);cursor:default;opacity:.85}
+.btn-reveal:disabled{pointer-events:none}
 .conclusiones{list-style:none;padding:0;margin:1rem 0}
 .conclusiones li{padding:.6rem 0 .6rem 2rem;position:relative;font-size:.95rem;line-height:1.6}
 .conclusiones li::before{content:"";position:absolute;left:.2rem;top:.7rem;width:10px;height:6px;border-left:2.5px solid var(--success);border-bottom:2.5px solid var(--success);transform:rotate(-45deg)}

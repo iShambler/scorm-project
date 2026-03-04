@@ -20,6 +20,8 @@ class Lang
             'click_cards_instruction' => 'Haz clic en cada tarjeta para ver la definición:',
             'drag_instruction'        => 'Arrastra cada definición junto al concepto correcto:',
             'drop_here'               => 'Suelta aquí',
+            'show_next'               => 'Mostrar siguiente',
+            'completed_list'          => 'Completado',
             'digital_classroom'       => 'Aula digital de formación',
 
             // Secciones
@@ -83,6 +85,8 @@ class Lang
             'click_cards_instruction' => 'Click each card to see the definition:',
             'drag_instruction'        => 'Drag each definition next to the correct concept:',
             'drop_here'               => 'Drop here',
+            'show_next'               => 'Show next',
+            'completed_list'          => 'Completed',
             'digital_classroom'       => 'Digital learning classroom',
 
             // Secciones

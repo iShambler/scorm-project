@@ -27,6 +27,7 @@ class SCORMGenerator
     private array $templateData;
     private int $accCounter = 0;  // contador global de acordeones por unidad (evita IDs duplicados)
     private int $tabCounter = 0;  // contador global de tabs por unidad (evita IDs duplicados)
+    private int $listCounter = 0; // contador global de listas interactivas por unidad
 
     public function __construct(array $moduleConfig, array $units, array $images = [], string $templateId = 'arelance-corporate', string $language = 'es')
     {
@@ -120,6 +121,7 @@ class SCORMGenerator
     {
         $this->accCounter = 0;  // resetear IDs de acordeón para cada unidad
         $this->tabCounter = 0;  // resetear IDs de tabs para cada unidad
+        $this->listCounter = 0; // resetear IDs de listas para cada unidad
         $mod   = $this->e($this->moduleConfig['titulo']);
         $cod   = $this->e($this->moduleConfig['codigo']);
         $emp   = $this->e($this->moduleConfig['empresa'] ?? DEFAULT_COMPANY);
@@ -622,17 +624,26 @@ class SCORMGenerator
                     break;
 
                 case 'lista':
-                    $html .= '<ul class="lista_apte">';
+                    // Preparar items
+                    $listItems = [];
                     if (!empty($items)) {
-                        foreach ($items as $it) $html .= '<li>' . $this->e($it) . '</li>';
+                        foreach ($items as $it) $listItems[] = $this->e($it);
                     } else {
-                        // Fallback: split contenido by newlines
                         foreach (preg_split('/\n+/', $contenido) as $line) {
                             $line = trim($line);
-                            if (!empty($line)) $html .= '<li>' . $this->e(preg_replace('/^[\-\*\x{2022}\d\.\)]+\s+/u', '', $line)) . '</li>';
+                            if (!empty($line)) $listItems[] = $this->e(preg_replace('/^[\-\*\x{2022}\d\.\)]+\s+/u', '', $line));
                         }
                     }
+                    $interactive = count($listItems) >= 3;
+                    $lid = 'list' . ($this->listCounter++);
+                    $html .= '<ul class="lista_apte' . ($interactive ? ' lista-reveal' : '') . '"' . ($interactive ? ' id="' . $lid . '"' : '') . '>';
+                    foreach ($listItems as $li) {
+                        $html .= '<li' . ($interactive ? ' class="reveal-item" style="display:none"' : '') . '>' . $li . '</li>';
+                    }
                     $html .= '</ul>';
+                    if ($interactive) {
+                        $html .= '<button class="btn-reveal" onclick="revealNext(\'' . $lid . '\')">' . Lang::get('show_next') . ' &#9654;</button>';
+                    }
                     break;
 
                 case 'comparativa':
@@ -849,9 +860,18 @@ class SCORMGenerator
                     $html .= '<div class="idevice ' . $cls . '"><div class="idevice-icon">' . self::svg($svgN, $svgC, 24) . '</div>'
                         . '<p><strong>' . $this->e($g['label']) . ':</strong> ' . $this->e($g['text']) . '</p></div>'; break;
                 case 'list':
-                    $html .= '<ul class="lista_apte">';
-                    foreach ($g['items'] as $li) $html .= '<li>' . $this->e($li['text']) . '</li>';
-                    $html .= '</ul>'; break;
+                    $listCount = count($g['items']);
+                    $isInteractive = $listCount >= 3;
+                    $listId = 'list' . ($this->listCounter++);
+                    $html .= '<ul class="lista_apte' . ($isInteractive ? ' lista-reveal' : '') . '"' . ($isInteractive ? ' id="' . $listId . '"' : '') . '>';
+                    foreach ($g['items'] as $li) {
+                        $html .= '<li' . ($isInteractive ? ' class="reveal-item" style="display:none"' : '') . '>' . $this->e($li['text']) . '</li>';
+                    }
+                    $html .= '</ul>';
+                    if ($isInteractive) {
+                        $html .= '<button class="btn-reveal" onclick="revealNext(\'' . $listId . '\')">' . Lang::get('show_next') . ' &#9654;</button>';
+                    }
+                    break;
                 case 'paragraph': default:
                     $html .= '<p>' . $this->e($g['text']) . '</p>'; break;
             }
@@ -960,6 +980,7 @@ document.addEventListener('click',function(e){var d=e.target.closest('.matching-
 })();
 function comprobarMatching(btn){var a=btn.closest('.setup-content'),zs=a.querySelectorAll('.matching-dropzone'),t=zs.length,ok=0;zs.forEach(function(z){var d=z.querySelector('.matching-def');z.classList.remove('correcto','incorrecto');if(d&&d.dataset.match===z.dataset.expect){z.classList.add('correcto');ok++}else{z.classList.add('incorrecto')}});var r=a.querySelector('.matching-resultado');if(r){var p=Math.round(ok/t*100);r.style.display='block';r.className='matching-resultado '+(p===100?'passed':'failed');r.innerHTML=ok+'/'+t+' correctas ('+p+'%)'+(p===100?' \u00a1Perfecto!':' Revisa e intenta de nuevo.')}}
 function switchTab(containerId,idx){var c=document.getElementById(containerId);if(!c)return;c.querySelectorAll('.tab-btn').forEach(function(b,i){b.classList.toggle('active',i===idx)});c.querySelectorAll('.tab-panel').forEach(function(p,i){p.style.display=i===idx?'block':'none'})}
+function revealNext(id){var ul=document.getElementById(id);if(!ul)return;var items=ul.querySelectorAll('.reveal-item');var found=false;for(var i=0;i<items.length;i++){if(items[i].style.display==='none'){items[i].style.display='';items[i].style.animation='fadeSlideIn .4s ease-out';found=true;if(i===items.length-1){var btn=ul.nextElementSibling;if(btn&&btn.classList.contains('btn-reveal')){btn.textContent='\u2713 Completado';btn.disabled=true;btn.classList.add('completed')}}break}}};
 JSEND;
         // Inyectar traducciones en el JS
         $jsReplacements = [
@@ -967,6 +988,7 @@ JSEND;
             'correctas'                     => Lang::get('correct_answers'),
             '\u00a1Perfecto!'               => addslashes(Lang::get('perfect')),
             'Revisa e intenta de nuevo.'    => addslashes(Lang::get('review_retry')),
+            '\u2713 Completado'             => '\u2713 ' . addslashes(Lang::get('completed_list')),
         ];
         foreach ($jsReplacements as $from => $to) {
             $js = str_replace($from, $to, $js);
@@ -1199,6 +1221,10 @@ img{max-width:100%}.d-none{display:none!important}
 .lista_apte{list-style:none;padding:0;margin:1rem 0}
 .lista_apte li{padding:.5rem 0 .5rem 2rem;position:relative;border-bottom:1px solid #f0f0f0;font-size:.95rem;line-height:1.6}
 .lista_apte li::before{content:"";position:absolute;left:.5rem;top:.95rem;width:8px;height:8px;border-radius:50%;background:var(--accent);display:block}
+.btn-reveal{display:inline-flex;align-items:center;gap:.4rem;margin:.3rem 0 1rem .5rem;padding:.45rem 1.2rem;background:transparent;color:var(--primary);border:1.5px solid var(--border);border-radius:8px;cursor:pointer;font-size:.85rem;font-weight:500;transition:all .25s;font-family:'Inter',sans-serif}
+.btn-reveal:hover{background:var(--primary);color:#fff;border-color:var(--primary);transform:translateY(-1px);box-shadow:0 2px 8px rgba(20,53,84,.15)}
+.btn-reveal.completed{background:var(--success);color:#fff;border-color:var(--success);cursor:default;opacity:.85}
+.btn-reveal:disabled{pointer-events:none}
 .conclusiones{list-style:none;padding:0;margin:1rem 0}
 .conclusiones li{padding:.6rem 0 .6rem 2rem;position:relative;font-size:.95rem;line-height:1.6}
 .conclusiones li::before{content:"";position:absolute;left:.2rem;top:.7rem;width:10px;height:6px;border-left:2.5px solid var(--success);border-bottom:2.5px solid var(--success);transform:rotate(-45deg)}
