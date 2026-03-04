@@ -6,6 +6,7 @@
 namespace ScormConverter;
 
 require_once __DIR__ . '/../libs/tcpdf/tcpdf.php';
+require_once __DIR__ . '/Lang.php';
 
 /**
  * Subclase TCPDF con footer personalizado (sin branding TCPDF)
@@ -36,11 +37,12 @@ class PDFGenerator
     private ?string $logoPath = null;
     private CoursePDF $pdf;
 
-    public function __construct(array $moduleConfig, array $units, string $templateId = 'arelance-corporate')
+    public function __construct(array $moduleConfig, array $units, string $templateId = 'arelance-corporate', string $language = 'es')
     {
         $this->moduleConfig = $moduleConfig;
         $this->units = $units;
         $this->templateId = $templateId;
+        Lang::set($language);
         $this->colors = [
             'primary' => '#143554',
             'accent'  => '#F05726',
@@ -75,11 +77,11 @@ class PDFGenerator
         $this->pdf->setPrintFooter(false);
         $this->pdf->SetFont('dejavusans', 'B', 18);
         $this->pdf->SetTextColor(...$this->hexToRGB($this->colors['primary']));
-        $this->pdf->Cell(0, 15, $this->decode('Índice'), 0, 1, 'C');
+        $this->pdf->Cell(0, 15, $this->decode(Lang::get('index')), 0, 1, 'C');
         $this->pdf->Ln(5);
         $this->pdf->SetFont('dejavusans', '', 11);
         $this->pdf->SetTextColor(51, 51, 51);
-        $this->pdf->addTOC(2, 'dejavusans', '.', $this->decode('Índice'), '', [51, 51, 51]);
+        $this->pdf->addTOC(2, 'dejavusans', '.', $this->decode(Lang::get('index')), '', [51, 51, 51]);
         $this->pdf->endTOCPage();
 
         $pdfPath = (defined('TEMP_PATH') ? TEMP_PATH : sys_get_temp_dir()) . '/pdf_' . uniqid() . '.pdf';
@@ -199,8 +201,8 @@ class PDFGenerator
         $dur = $this->moduleConfig['duracion_total'] ?? '';
         $nUnits = count($this->units);
         $info = '';
-        if ($dur) $info .= $this->decode('Duración: ' . $dur . ' horas');
-        if ($nUnits) $info .= ($info ? '  |  ' : '') . $nUnits . ($nUnits === 1 ? ' unidad' : ' unidades');
+        if ($dur) $info .= $this->decode(Lang::get('duration') . ': ' . $dur . ' ' . Lang::get('hours'));
+        if ($nUnits) $info .= ($info ? '  |  ' : '') . $nUnits . ' ' . ($nUnits === 1 ? Lang::get('unit') : Lang::get('units'));
         $this->pdf->Cell(0, 8, $info, 0, 1, 'C');
 
         // Línea separadora accent
@@ -213,7 +215,7 @@ class PDFGenerator
         $this->pdf->SetY(260);
         $this->pdf->SetFont('dejavusans', '', 9);
         $this->pdf->SetTextColor(153, 153, 153);
-        $this->pdf->Cell(0, 5, $this->decode('© ' . date('Y') . ' ' . $emp . ' — Documento generado automáticamente'), 0, 1, 'C');
+        $this->pdf->Cell(0, 5, $this->decode('© ' . date('Y') . ' ' . $emp . ' — ' . Lang::get('auto_generated')), 0, 1, 'C');
     }
 
     // ── TÍTULO UNIDAD ──
@@ -235,7 +237,7 @@ class PDFGenerator
         $this->pdf->SetFont('dejavusans', 'B', 12);
         $this->pdf->SetFillColor(...$acc);
         $this->pdf->SetTextColor(255, 255, 255);
-        $badge = $this->decode('Unidad ' . ($unit['numero'] ?? ''));
+        $badge = $this->decode(Lang::get('unit_label') . ' ' . ($unit['numero'] ?? ''));
         $badgeW = $this->pdf->GetStringWidth($badge) + 16;
         $this->pdf->SetX((210 - $badgeW) / 2);
         $this->pdf->Cell($badgeW, 10, $badge, 0, 1, 'C', true, '', 0, false, 'T', 'M');
@@ -251,7 +253,7 @@ class PDFGenerator
             $this->pdf->Ln(5);
             $this->pdf->SetFont('dejavusans', '', 11);
             $this->pdf->SetTextColor(102, 102, 102);
-            $this->pdf->Cell(0, 7, $this->decode('Duración: ' . $unit['duracion'] . ' horas'), 0, 1, 'C');
+            $this->pdf->Cell(0, 7, $this->decode(Lang::get('duration') . ': ' . $unit['duracion'] . ' ' . Lang::get('hours')), 0, 1, 'C');
         }
 
         // Resumen
@@ -264,7 +266,7 @@ class PDFGenerator
         }
 
         // Bookmark para el TOC
-        $this->pdf->Bookmark($this->decode('Unidad ' . ($unit['numero'] ?? '') . ': ' . ($unit['titulo'] ?? '')), 0);
+        $this->pdf->Bookmark($this->decode(Lang::get('unit_label') . ' ' . ($unit['numero'] ?? '') . ': ' . ($unit['titulo'] ?? '')), 0);
     }
 
     // ── OBJETIVOS ──
@@ -274,7 +276,7 @@ class PDFGenerator
         if (empty($unit['objetivos'])) return;
 
         $this->pdf->Ln(8);
-        $this->sectionHeading('Objetivos de aprendizaje');
+        $this->sectionHeading(Lang::get('learning_objectives'));
         $pri = $this->colors['primary'];
 
         $html = '<ul style="font-size:10px; line-height:1.6;">';
@@ -293,7 +295,7 @@ class PDFGenerator
         if (empty($unit['secciones'])) return;
 
         foreach ($unit['secciones'] as $si => $sec) {
-            $titulo = $sec['titulo'] ?? ('Sección ' . ($si + 1));
+            $titulo = $sec['titulo'] ?? (Lang::get('section') . ' ' . ($si + 1));
             $this->pdf->Bookmark($this->decode($titulo), 1);
             $this->sectionHeading($titulo);
 
@@ -399,7 +401,7 @@ class PDFGenerator
                         foreach ($items as $pi => $paso) {
                             $stepN = $pi + 1;
                             $html .= '<div style="margin:3px 0; font-size:10px;">'
-                                . '<span style="font-weight:bold; color:' . $acc . ';">Paso ' . $stepN . ':</span> '
+                                . '<span style="font-weight:bold; color:' . $acc . ';">' . Lang::get('step') . ' ' . $stepN . ':</span> '
                                 . $this->e($paso) . '</div>';
                         }
                         $this->pdf->writeHTML($html, true, false, true, false, '');
@@ -408,28 +410,28 @@ class PDFGenerator
 
                 case 'tip_importante':
                     $html = '<br><div style="background-color:#FEF3C7; padding:10px 14px; margin:10px 0; font-size:10px;">'
-                        . '<span style="font-weight:bold; color:#D97706;">' . $this->e($etiqueta ?: 'Importante') . ':</span> '
+                        . '<span style="font-weight:bold; color:#D97706;">' . $this->e($etiqueta ?: Lang::get('important')) . ':</span> '
                         . $this->e($contenido) . '</div><br>';
                     $this->pdf->writeHTML($html, true, false, true, false, '');
                     break;
 
                 case 'tip_saber':
                     $html = '<br><div style="background-color:#DCFCE7; padding:10px 14px; margin:10px 0; font-size:10px;">'
-                        . '<span style="font-weight:bold; color:#16A34A;">' . $this->e($etiqueta ?: $this->decode('Sabías que')) . ':</span> '
+                        . '<span style="font-weight:bold; color:#16A34A;">' . $this->e($etiqueta ?: Lang::get('did_you_know')) . ':</span> '
                         . $this->e($contenido) . '</div><br>';
                     $this->pdf->writeHTML($html, true, false, true, false, '');
                     break;
 
                 case 'tip_practica':
                     $html = '<br><div style="background-color:#FDF2F8; padding:10px 14px; margin:10px 0; font-size:10px;">'
-                        . '<span style="font-weight:bold; color:#DB2777;">' . $this->e($etiqueta ?: $this->decode('Práctica')) . ':</span> '
+                        . '<span style="font-weight:bold; color:#DB2777;">' . $this->e($etiqueta ?: Lang::get('practice')) . ':</span> '
                         . $this->e($contenido) . '</div><br>';
                     $this->pdf->writeHTML($html, true, false, true, false, '');
                     break;
 
                 case 'ejemplo':
                     $html = '<br><div style="background-color:#F0FDF4; padding:10px 14px; margin:10px 0; font-size:10px;">'
-                        . '<span style="font-weight:bold; color:#22C55E;">' . $this->e($etiqueta ?: 'Ejemplo') . ':</span> '
+                        . '<span style="font-weight:bold; color:#22C55E;">' . $this->e($etiqueta ?: Lang::get('example')) . ':</span> '
                         . $this->e($contenido) . '</div><br>';
                     $this->pdf->writeHTML($html, true, false, true, false, '');
                     break;
@@ -456,12 +458,12 @@ class PDFGenerator
         if (empty($unit['conceptos_clave'])) return;
 
         $this->pdf->Ln(4);
-        $this->sectionHeading('Conceptos clave');
+        $this->sectionHeading(Lang::get('key_concepts'));
         $pri = $this->colors['primary'];
 
         $html = '<table border="1" cellpadding="6" style="font-size:10px; border-color:#cccccc;">'
             . '<tr><th style="background-color:' . $pri . '; color:#ffffff; font-weight:bold; width:30%;">Concepto</th>'
-            . '<th style="background-color:' . $pri . '; color:#ffffff; font-weight:bold; width:70%;">' . $this->decode('Definición') . '</th></tr>';
+            . '<th style="background-color:' . $pri . '; color:#ffffff; font-weight:bold; width:70%;">' . $this->decode(Lang::get('definition')) . '</th></tr>';
 
         foreach ($unit['conceptos_clave'] as $fc) {
             $concepto = $fc['concepto'] ?? $fc['termino'] ?? '';
@@ -480,8 +482,8 @@ class PDFGenerator
         if (empty($unit['preguntas'])) return;
 
         $this->pdf->AddPage();
-        $this->pdf->Bookmark($this->decode('Autoevaluación — Ud. ' . ($unit['numero'] ?? '')), 1);
-        $this->sectionHeading($this->decode('Autoevaluación'));
+        $this->pdf->Bookmark($this->decode(Lang::get('self_assessment') . ' — Ud. ' . ($unit['numero'] ?? '')), 1);
+        $this->sectionHeading(Lang::get('self_assessment'));
         $acc = $this->colors['accent'];
 
         foreach ($unit['preguntas'] as $qi => $q) {
@@ -527,7 +529,7 @@ class PDFGenerator
         if (empty($unit['conclusiones_ia'])) return;
 
         $this->pdf->Ln(4);
-        $this->sectionHeading('Conclusiones');
+        $this->sectionHeading(Lang::get('conclusions'));
 
         $html = '<ul style="font-size:10px; line-height:1.6;">';
         foreach ($unit['conclusiones_ia'] as $c) {
@@ -572,8 +574,8 @@ class PDFGenerator
         $this->pdf->Ln(5);
         $this->pdf->SetFont('dejavusans', '', 10);
         $this->pdf->SetTextColor(102, 102, 102);
-        $this->pdf->Cell(0, 7, $this->decode('© ' . date('Y') . ' — Todos los derechos reservados'), 0, 1, 'C');
-        $this->pdf->Cell(0, 7, $this->decode('Documento generado automáticamente'), 0, 1, 'C');
+        $this->pdf->Cell(0, 7, $this->decode('© ' . date('Y') . ' — ' . Lang::get('all_rights')), 0, 1, 'C');
+        $this->pdf->Cell(0, 7, $this->decode(Lang::get('auto_generated')), 0, 1, 'C');
     }
 
     // ── HELPERS ──
@@ -649,17 +651,17 @@ class PDFGenerator
                 case 'importante':
                     $block['tipo'] = 'tip_importante';
                     $block['contenido'] = $item['texto'] ?? $item['contenido'] ?? '';
-                    $block['etiqueta'] = 'Importante';
+                    $block['etiqueta'] = Lang::get('important');
                     break;
                 case 'sabias_que':
                     $block['tipo'] = 'tip_saber';
                     $block['contenido'] = $item['texto'] ?? $item['contenido'] ?? '';
-                    $block['etiqueta'] = $this->decode('Sabías que');
+                    $block['etiqueta'] = Lang::get('did_you_know');
                     break;
                 case 'ejemplo':
                     $block['tipo'] = 'ejemplo';
                     $block['contenido'] = $item['texto'] ?? $item['contenido'] ?? '';
-                    $block['etiqueta'] = 'Ejemplo';
+                    $block['etiqueta'] = Lang::get('example');
                     break;
                 case 'proceso':
                     $block['items'] = $item['items'] ?? [];

@@ -77,7 +77,8 @@ try {
     }
 
     $templateId = $data['template_id'] ?? 'arelance-corporate';
-    $generator = new PDFGenerator($moduleConfig, $units, $templateId);
+    $language = $data['modulo']['idioma'] ?? 'es';
+    $generator = new PDFGenerator($moduleConfig, $units, $templateId, $language);
     $pdfPath = $generator->generate();
 
     if (!file_exists($pdfPath)) {

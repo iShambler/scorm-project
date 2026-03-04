@@ -125,7 +125,8 @@ try {
     
     // Generar paquete SCORM con plantilla seleccionada
     $templateId = $data['template_id'] ?? 'arelance-corporate';
-    $generator = new SCORMGenerator($moduleConfig, $units, $allImages, $templateId);
+    $language = $data['modulo']['idioma'] ?? 'es';
+    $generator = new SCORMGenerator($moduleConfig, $units, $allImages, $templateId, $language);
     $zipPath = $generator->generate();
     
     if (!file_exists($zipPath)) {

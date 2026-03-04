@@ -14,6 +14,7 @@ namespace ScormConverter;
 
 use ZipArchive;
 require_once __DIR__ . '/IconifyHelper.php';
+require_once __DIR__ . '/Lang.php';
 
 class SCORMGenerator
 {
@@ -26,13 +27,14 @@ class SCORMGenerator
     private array $templateData;
     private int $accCounter = 0;  // contador global de acordeones por unidad (evita IDs duplicados)
 
-    public function __construct(array $moduleConfig, array $units, array $images = [], string $templateId = 'arelance-corporate')
+    public function __construct(array $moduleConfig, array $units, array $images = [], string $templateId = 'arelance-corporate', string $language = 'es')
     {
         $this->moduleConfig = $moduleConfig;
         $this->units = $units;
         $this->images = $images;
         $this->templateId = $templateId;
         $this->templateData = [];
+        Lang::set($language);
         $this->tempPath = TEMP_PATH . '/' . generateUniqueId();
         foreach (['', '/css', '/js', '/scos', '/img'] as $d) {
             @mkdir($this->tempPath . $d, 0755, true);
@@ -139,7 +141,7 @@ class SCORMGenerator
         // Objetivos
         $objHtml = '';
         if (!empty($unit['objetivos'])) {
-            $objHtml = '<h2 class="site__objetivos">Objetivos</h2><ul class="objetivos">';
+            $objHtml = '<h2 class="site__objetivos">' . Lang::get('objectives') . '</h2><ul class="objetivos">';
             foreach ($unit['objetivos'] as $o) $objHtml .= $this->renderObjetivo($o);
             $objHtml .= '</ul>';
         }
@@ -152,7 +154,7 @@ class SCORMGenerator
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
-<title>Unidad ' . $udN . ': ' . $udT . '</title>
+<title>' . Lang::get('unit_label') . ' ' . $udN . ': ' . $udT . '</title>
 <link href="../css/estilos.css" rel="stylesheet">
 </head>
 <body>
@@ -163,13 +165,13 @@ class SCORMGenerator
 <!-- PORTADA -->
 <div class="content content--intro">
   <div class="content__inner">
-    <div class="corpo">' . $this->getLogoHTML() . '<span class="corpo-logo">' . $emp . '</span><p>Aula digital de formaci&oacute;n</p></div>
+    <div class="corpo">' . $this->getLogoHTML() . '<span class="corpo-logo">' . $emp . '</span><p>' . $this->e(Lang::get('digital_classroom')) . '</p></div>
     <div class="portada-center">
       <p class="portada__modulo">' . $cod . '</p>
-      <span class="portada__badge">Unidad ' . $udN . '</span>
+      <span class="portada__badge">' . Lang::get('unit_label') . ' ' . $udN . '</span>
       <h1 class="portada__title">' . $udT . '</h1>
       <p class="portada__duracion">&#9201; ' . $dur . ' horas</p>
-      <a href="#" class="btn-comenzar cierra">Comenzar &rarr;</a>
+      <a href="#" class="btn-comenzar cierra">' . Lang::get('start') . ' &rarr;</a>
     </div>
   </div>
 </div>
@@ -197,10 +199,10 @@ class SCORMGenerator
 <div class="home">
   <div class="main">
     <section class="site">
-      <h1 class="site__title">Unidad ' . $udN . ':<br>' . $udT . '</h1>
+      <h1 class="site__title">' . Lang::get('unit_label') . ' ' . $udN . ':<br>' . $udT . '</h1>
       <div class="site__separator"></div>
       ' . $resHtml . $objHtml . '
-      <div class="home-nav"><a href="#" class="btn-action tema" style="margin-top:1.5rem;display:inline-block;padding:.85rem 2.5rem;border-radius:50px;font-size:1rem">Ver contenido &rarr;</a></div>
+      <div class="home-nav"><a href="#" class="btn-action tema" style="margin-top:1.5rem;display:inline-block;padding:.85rem 2.5rem;border-radius:50px;font-size:1rem">' . Lang::get('view_content') . ' &rarr;</a></div>
     </section>
   </div>
   <footer class="main-footer"><p>&copy; ' . date('Y') . ' ' . $emp . '</p></footer>
@@ -208,7 +210,7 @@ class SCORMGenerator
 
 <!-- CONTENIDO -->
 <div class="contenido">
-  <a href="#" class="back float-right btn__back" title="Inicio">&#8592; Inicio</a>
+  <a href="#" class="back float-right btn__back" title="' . Lang::get('home') . '">&#8592; ' . Lang::get('home') . '</a>
   <div class="titulotema">
     <h5 id="numero" class="text-on-back"></h5>
     <h1 id="unidad" class="profile-title"></h1>
@@ -246,7 +248,7 @@ class SCORMGenerator
             'id' => 'step-index', 'label' => 'Ud. ' . $udN . ': ' . $unit['titulo'],
             'epi' => false, 'hide' => false,
             'html' => $this->wrapStep('step-index', false, true,
-                '<h3>&Iacute;ndice de contenidos</h3>'
+                '<h3>' . Lang::get('table_of_contents') . '</h3>'
                 . $epsIdx)
         ];
 
@@ -348,28 +350,28 @@ class SCORMGenerator
 
         // --- FLASHCARDS ---
         if (!empty($unit['conceptos_clave'])) {
-            $fh = '<p>Haz clic en cada tarjeta para ver la definici&oacute;n:</p><div class="flashcards-grid">';
+            $fh = '<p>' . $this->e(Lang::get('click_cards_instruction')) . '</p><div class="flashcards-grid">';
             foreach ($unit['conceptos_clave'] as $c) {
                 $fh .= '<div class="flashcard" onclick="this.classList.toggle(\'flipped\')"><div class="flashcard-inner">'
-                    . '<div class="flashcard-front"><h4>' . $this->e($c['termino'] ?? '') . '</h4><span class="flashcard-hint">Clic para ver</span></div>'
+                    . '<div class="flashcard-front"><h4>' . $this->e($c['termino'] ?? '') . '</h4><span class="flashcard-hint">' . Lang::get('click_to_see') . '</span></div>'
                     . '<div class="flashcard-back"><p>' . $this->e($c['definicion'] ?? '') . '</p></div>'
                     . '</div></div>';
             }
             $fh .= '</div>';
             $steps[] = [
-                'id' => 'step-flashcards', 'label' => 'Conceptos clave', 'epi' => true, 'hide' => false,
+                'id' => 'step-flashcards', 'label' => $this->e(Lang::get('key_concepts')), 'epi' => true, 'hide' => false,
                 'html' => $this->wrapStep('step-flashcards', true, true,
-                    '<hr class="line-accent"><h3>Conceptos clave</h3>' . $fh)
+                    '<hr class="line-accent"><h3>' . $this->e(Lang::get('key_concepts')) . '</h3>' . $fh)
             ];
         }
 
         // --- MATCHING ---
         if (!empty($unit['conceptos_clave']) && count($unit['conceptos_clave']) >= 4) {
             $items = array_slice($unit['conceptos_clave'], 0, 5);
-            $mh = '<p>Arrastra cada definici&oacute;n junto al concepto correcto:</p><div class="matching-game"><div class="matching-conceptos">';
+            $mh = '<p>' . $this->e(Lang::get('drag_instruction')) . '</p><div class="matching-game"><div class="matching-conceptos">';
             foreach ($items as $mi => $c) {
                 $mh .= '<div class="matching-row"><div class="matching-term" data-match="m' . $mi . '">' . $this->e($c['termino'])
-                    . '</div><div class="matching-dropzone" data-expect="m' . $mi . '"><span class="dropzone-hint">Suelta aqu&iacute;</span></div></div>';
+                    . '</div><div class="matching-dropzone" data-expect="m' . $mi . '"><span class="dropzone-hint">' . $this->e(Lang::get('drop_here')) . '</span></div></div>';
             }
             $mh .= '</div><div class="matching-definiciones">';
             $sh = $items; shuffle($sh);
@@ -384,11 +386,11 @@ class SCORMGenerator
                 }
                 $mh .= '<div class="matching-def" draggable="true" data-match="m' . $oi . '">' . $this->e($defText) . '</div>';
             }
-            $mh .= '</div></div><button class="btn-action" onclick="comprobarMatching(this)">Comprobar</button><div class="matching-resultado"></div>';
+            $mh .= '</div></div><button class="btn-action" onclick="comprobarMatching(this)">' . $this->e(Lang::get('check')) . '</button><div class="matching-resultado"></div>';
             $steps[] = [
-                'id' => 'step-matching', 'label' => 'Relaciona conceptos', 'epi' => true, 'hide' => true,
+                'id' => 'step-matching', 'label' => $this->e(Lang::get('match_concepts')), 'epi' => true, 'hide' => true,
                 'html' => $this->wrapStep('step-matching', true, true,
-                    '<hr class="line-accent"><h3>Relaciona conceptos</h3>' . $mh)
+                    '<hr class="line-accent"><h3>' . $this->e(Lang::get('match_concepts')) . '</h3>' . $mh)
             ];
         }
 
@@ -403,22 +405,22 @@ class SCORMGenerator
                     $v = ($oi === $ci) ? 'correcta' : 'incorrecta' . $oi;
                     $oh .= '<label class="quiz-label"><input type="radio" name="opcion_q' . $qn . '" value="' . $v . '"> ' . $this->e($op) . '</label>';
                 }
-                $eo = addslashes($this->e($q['explicacion'] ?? 'Correcto.'));
-                $eb = addslashes($this->e($q['explicacion'] ?? 'Revisa el contenido.'));
+                $eo = addslashes($this->e($q['explicacion'] ?? Lang::get('correct')));
+                $eb = addslashes($this->e($q['explicacion'] ?? Lang::get('review_content')));
                 $steps[] = [
-                    'id' => 'step-auto' . $qn, 'label' => 'Autoevaluaci&oacute;n ' . $qn,
+                    'id' => 'step-auto' . $qn, 'label' => $this->e(Lang::get('self_assessment')) . ' ' . $qn,
                     'epi' => true, 'hide' => ($qn > 1),
                     'html' => $this->wrapStep('step-auto' . $qn, true, true,
-                        '<hr class="line-accent"><h3>Autoevaluaci&oacute;n ' . $qn . '/' . $tq . '</h3>'
+                        '<hr class="line-accent"><h3>' . $this->e(Lang::get('self_assessment')) . ' ' . $qn . '/' . $tq . '</h3>'
                         . '<div class="card-box"><p class="pregunta">' . $this->e($q['pregunta']) . '</p>' . $oh
-                        . '<center><button class="btn-action mt-3" onclick="capturarQ(' . $qn . ',\'' . $eo . '\',\'' . $eb . '\')">Comprobar</button></center>'
+                        . '<center><button class="btn-action mt-3" onclick="capturarQ(' . $qn . ',\'' . $eo . '\',\'' . $eb . '\')">' . $this->e(Lang::get('check')) . '</button></center>'
                         . '<div id="resultado_q' . $qn . '"></div></div>')
                 ];
             }
         }
 
         // --- CONCLUSIONES ---
-        $conc = '<h4>Lo que has aprendido:</h4>';
+        $conc = '<h4>' . $this->e(Lang::get('what_you_learned')) . '</h4>';
         // Fase 2: usar conclusiones generadas por IA si están disponibles
         $concItems = !empty($unit['conclusiones_ia']) ? $unit['conclusiones_ia'] : ($unit['objetivos'] ?? []);
         if (!empty($concItems)) {
@@ -427,9 +429,9 @@ class SCORMGenerator
             $conc .= '</ul>';
         }
         $steps[] = [
-            'id' => 'step-conclusion', 'label' => 'Conclusiones', 'epi' => false, 'hide' => true,
+            'id' => 'step-conclusion', 'label' => $this->e(Lang::get('conclusions')), 'epi' => false, 'hide' => true,
             'html' => $this->wrapStep('step-conclusion', true, true,
-                '<h3>Conclusiones</h3>'
+                '<h3>' . $this->e(Lang::get('conclusions')) . '</h3>'
                 . '<div class="card-box intro">' . $conc . '</div>')
         ];
 
@@ -439,12 +441,12 @@ class SCORMGenerator
             $p = $this->units[$idx - 1];
             $nav .= '<a href="' . $p['filename'] . '.html" data-container="' . $p['filename'] . '_container.html" class="btn-nav ud-link">&larr; UD ' . $p['numero'] . '</a>';
         }
-        $nav .= '<button class="btn-nav back">&#127968; Inicio</button>';
+        $nav .= '<button class="btn-nav back">&#127968; ' . $this->e(Lang::get('home')) . '</button>';
         if ($idx < $totalUnits - 1) {
             $n = $this->units[$idx + 1];
             $nav .= '<a href="' . $n['filename'] . '.html" data-container="' . $n['filename'] . '_container.html" class="btn-nav ud-link">UD ' . $n['numero'] . ' &rarr;</a>';
         } else {
-            $nav .= '<span class="btn-nav completed">&#10003; M&oacute;dulo completado</span>';
+            $nav .= '<span class="btn-nav completed">&#10003; ' . $this->e(Lang::get('module_completed')) . '</span>';
         }
         $nav .= '</div>';
 
@@ -453,7 +455,7 @@ class SCORMGenerator
                 . '<source src="../img/congratulationsc.mp4" type="video/mp4">'
                 . '</video>';
         } elseif (file_exists(dirname(__DIR__) . '/assets/img/celebration.gif')) {
-            $gifHtml = '<img src="../img/celebration.gif" alt="¡Enhorabuena!" class="celebration-gif">';
+            $gifHtml = '<img src="../img/celebration.gif" alt="' . $this->e(Lang::get('congratulations')) . '" class="celebration-gif">';
         } else {
             $gifHtml = '';
         }
@@ -462,8 +464,8 @@ class SCORMGenerator
             'html' => $this->wrapStep('step-final', true, false,
                 '<div class="card-box intro final-box"><div class="final-content">'
                 . $gifHtml
-                . '<h1 class="enhorabuena">&#127881; &iexcl;Enhorabuena!</h1>'
-                . '<h2>Has completado la Unidad ' . $udN . ': ' . $this->e($unit['titulo']) . '</h2>'
+                . '<h1 class="enhorabuena">&#127881; ' . $this->e(Lang::get('congratulations')) . '</h1>'
+                . '<h2>' . $this->e($unit['titulo']) . '</h2>'
                 . $nav
                 . '<p class="copyright">&copy; ' . date('Y') . ' ' . $this->e($this->moduleConfig['empresa'] ?? DEFAULT_COMPANY) . '</p>'
                 . '</div></div>')
@@ -515,17 +517,17 @@ class SCORMGenerator
                 case 'importante':
                     $block['tipo'] = 'tip_importante';
                     $block['contenido'] = $item['texto'] ?? $item['contenido'] ?? '';
-                    $block['etiqueta'] = 'Importante';
+                    $block['etiqueta'] = Lang::get('important');
                     break;
                 case 'sabias_que':
                     $block['tipo'] = 'tip_saber';
                     $block['contenido'] = $item['texto'] ?? $item['contenido'] ?? '';
-                    $block['etiqueta'] = 'Sabías que';
+                    $block['etiqueta'] = Lang::get('did_you_know');
                     break;
                 case 'ejemplo':
                     $block['tipo'] = 'ejemplo';
                     $block['contenido'] = $item['texto'] ?? $item['contenido'] ?? '';
-                    $block['etiqueta'] = 'Ejemplo';
+                    $block['etiqueta'] = Lang::get('example');
                     break;
                 case 'proceso':
                     $block['items'] = $item['items'] ?? [];
@@ -580,14 +582,14 @@ class SCORMGenerator
      */
     private function renderObjetivo(string $obj): string
     {
-        if (preg_match('/^\[(Recordar|Comprender|Aplicar|Analizar|Evaluar|Crear)\]\s*(.+)$/u', $obj, $m)) {
+        if (preg_match('/^\[(Recordar|Comprender|Aplicar|Analizar|Evaluar|Crear|Remember|Understand|Apply|Analyze|Evaluate|Create)\]\s*(.+)$/u', $obj, $m)) {
             $colorMap = [
-                'Recordar'   => '#6b7280',
-                'Comprender' => '#3b82f6',
-                'Aplicar'    => '#10b981',
-                'Analizar'   => '#f59e0b',
-                'Evaluar'    => '#ef4444',
-                'Crear'      => '#8b5cf6',
+                'Recordar'   => '#6b7280', 'Remember'   => '#6b7280',
+                'Comprender' => '#3b82f6', 'Understand' => '#3b82f6',
+                'Aplicar'    => '#10b981', 'Apply'      => '#10b981',
+                'Analizar'   => '#f59e0b', 'Analyze'    => '#f59e0b',
+                'Evaluar'    => '#ef4444', 'Evaluate'   => '#ef4444',
+                'Crear'      => '#8b5cf6', 'Create'     => '#8b5cf6',
             ];
             $color = $colorMap[$m[1]] ?? '#143554';
             return '<li><span style="background:' . $color . ';color:#fff;padding:1px 7px;border-radius:3px;'
@@ -667,7 +669,7 @@ class SCORMGenerator
                         if (mb_strlen($workText) > mb_strlen($accTitle)) $accTitle .= '...';
                         $html .= '<div class="accordion-item">'
                             . '<div class="accordion-header" onclick="toggleAccordion(\'' . $cid . '\')">'
-                            . '<span class="acc-title">Paso ' . ($pi + 1) . ': ' . $this->e($accTitle) . '</span>'
+                            . '<span class="acc-title">' . Lang::get('step') . ' ' . ($pi + 1) . ': ' . $this->e($accTitle) . '</span>'
                             . '<span class="accordion-arrow">&#8594;</span></div>'
                             . '<div class="accordion-body" id="' . $cid . '"><p>' . $this->e($paso) . '</p></div></div>';
                     }
@@ -676,22 +678,22 @@ class SCORMGenerator
 
                 case 'tip_importante':
                     $html .= '<div class="idevice importante"><div class="idevice-icon">' . self::svg('warning', '#d97706', 24) . '</div>'
-                        . '<p><strong>' . $this->e($etiqueta ?: 'Importante') . ':</strong> ' . $this->e($contenido) . '</p></div>';
+                        . '<p><strong>' . $this->e($etiqueta ?: Lang::get('important')) . ':</strong> ' . $this->e($contenido) . '</p></div>';
                     break;
 
                 case 'tip_saber':
                     $html .= '<div class="idevice saber"><div class="idevice-icon">' . self::svg('lightbulb', '#16a34a', 24) . '</div>'
-                        . '<p><strong>' . $this->e($etiqueta ?: 'Sab&iacute;as que') . ':</strong> ' . $this->e($contenido) . '</p></div>';
+                        . '<p><strong>' . $this->e($etiqueta ?: Lang::get('did_you_know')) . ':</strong> ' . $this->e($contenido) . '</p></div>';
                     break;
 
                 case 'tip_practica':
                     $html .= '<div class="idevice practica"><div class="idevice-icon">' . self::svg('edit', '#db2777', 24) . '</div>'
-                        . '<p><strong>' . $this->e($etiqueta ?: 'Pr&aacute;ctica') . ':</strong> ' . $this->e($contenido) . '</p></div>';
+                        . '<p><strong>' . $this->e($etiqueta ?: Lang::get('practice')) . ':</strong> ' . $this->e($contenido) . '</p></div>';
                     break;
 
                 case 'ejemplo':
                     $html .= '<div class="idevice saber"><div class="idevice-icon">' . self::svg('clipboard', '#16a34a', 24) . '</div>'
-                        . '<p><strong>' . $this->e($etiqueta ?: 'Ejemplo') . ':</strong> ' . $this->e($contenido) . '</p></div>';
+                        . '<p><strong>' . $this->e($etiqueta ?: Lang::get('example')) . ':</strong> ' . $this->e($contenido) . '</p></div>';
                     break;
 
                 case 'tabla':
@@ -945,6 +947,16 @@ document.addEventListener('click',function(e){var d=e.target.closest('.matching-
 function comprobarMatching(btn){var a=btn.closest('.setup-content'),zs=a.querySelectorAll('.matching-dropzone'),t=zs.length,ok=0;zs.forEach(function(z){var d=z.querySelector('.matching-def');z.classList.remove('correcto','incorrecto');if(d&&d.dataset.match===z.dataset.expect){z.classList.add('correcto');ok++}else{z.classList.add('incorrecto')}});var r=a.querySelector('.matching-resultado');if(r){var p=Math.round(ok/t*100);r.style.display='block';r.className='matching-resultado '+(p===100?'passed':'failed');r.innerHTML=ok+'/'+t+' correctas ('+p+'%)'+(p===100?' \u00a1Perfecto!':' Revisa e intenta de nuevo.')}}
 function switchTab(containerId,idx){var c=document.getElementById(containerId);if(!c)return;c.querySelectorAll('.tab-btn').forEach(function(b,i){b.classList.toggle('active',i===idx)});c.querySelectorAll('.tab-panel').forEach(function(p,i){p.style.display=i===idx?'block':'none'})}
 JSEND;
+        // Inyectar traducciones en el JS
+        $jsReplacements = [
+            'Suelta aqu\u00ed'              => addslashes(Lang::get('drop_here')),
+            'correctas'                     => Lang::get('correct_answers'),
+            '\u00a1Perfecto!'               => addslashes(Lang::get('perfect')),
+            'Revisa e intenta de nuevo.'    => addslashes(Lang::get('review_retry')),
+        ];
+        foreach ($jsReplacements as $from => $to) {
+            $js = str_replace($from, $to, $js);
+        }
         file_put_contents($this->tempPath . '/js/stepper.js', $js);
     }
 
@@ -982,6 +994,15 @@ if(sel==='correcta'){d.innerHTML='<div class="alert alert-success"><strong>\u00a
 else{d.innerHTML='<div class="alert alert-danger"><strong>Incorrecto.</strong> '+expBad+'</div>'}
 }
 JSEND;
+        // Inyectar traducciones en el JS de autoevaluación
+        $jsReplacements = [
+            'Elige una opci\u00f3n.'    => addslashes(Lang::get('choose_option')),
+            '\u00a1Correcto!'           => addslashes(Lang::get('correct')),
+            'Incorrecto.'               => addslashes(Lang::get('incorrect')),
+        ];
+        foreach ($jsReplacements as $from => $to) {
+            $js = str_replace($from, $to, $js);
+        }
         file_put_contents($this->tempPath . '/js/aut.js', $js);
     }
 
@@ -1340,9 +1361,9 @@ CSSEND;
         return $html;
     }
 
-    private function e(string $text): string
+    private function e(?string $text): string
     {
-        return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+        return htmlspecialchars($text ?? '', ENT_QUOTES, 'UTF-8');
     }
 
     /**

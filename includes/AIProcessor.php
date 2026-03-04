@@ -12,7 +12,8 @@ class AIProcessor
     private string $model;
     private int $maxTokens;
     private string $apiUrl = 'https://api.anthropic.com/v1/messages';
-    
+    private string $language = 'es';
+
     public function __construct()
     {
         $this->apiKey = CLAUDE_API_KEY;
@@ -24,6 +25,32 @@ class AIProcessor
         }
     }
     
+    /**
+     * Establece el idioma detectado para instrucciones en prompts
+     */
+    public function setLanguage(string $lang): void
+    {
+        $this->language = strtolower(substr(trim($lang), 0, 2)) ?: 'es';
+    }
+
+    /**
+     * Genera la instrucción de idioma para inyectar en prompts
+     */
+    private function getLanguageInstruction(): string
+    {
+        if ($this->language === 'es') return '';
+
+        $langNames = [
+            'en' => 'English', 'fr' => 'French', 'pt' => 'Portuguese',
+            'de' => 'German', 'it' => 'Italian', 'nl' => 'Dutch',
+        ];
+        $name = $langNames[$this->language] ?? $this->language;
+
+        return "\nIMPORTANTE: El contenido del documento está en {$name}. "
+            . "Genera TODO el contenido de salida (resumen, objetivos, conclusiones, conceptos_clave, definiciones, explicaciones, preguntas y opciones) en {$name}. "
+            . "Los nombres de los campos JSON se mantienen igual (en español).";
+    }
+
     /**
      * Analiza el contenido del documento y extrae estructura
      */
@@ -60,6 +87,7 @@ class AIProcessor
         $prompt = str_replace('{unit_title}', $unitTitle, $prompt);
         $prompt = str_replace('{unit_content}', $this->truncateContent($unitContent, 5000), $prompt);
         $prompt = str_replace('{concepts}', $conceptsText, $prompt);
+        $prompt = str_replace('{language_instruction}', $this->getLanguageInstruction(), $prompt);
         
         $response = $this->callAPI($prompt);
         $data = $this->parseJsonResponse($response);
@@ -108,6 +136,7 @@ PROMPT;
         $prompt = PROMPT_STRUCTURE_UNIT;
         $prompt = str_replace('{unit_title}', $unitTitle, $prompt);
         $prompt = str_replace('{unit_content}', $this->truncateContent($unitContent, 25000), $prompt);
+        $prompt = str_replace('{language_instruction}', $this->getLanguageInstruction(), $prompt);
         
         $response = $this->callAPI($prompt);
         $data = $this->parseJsonResponse($response);

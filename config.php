@@ -100,7 +100,8 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown, sin explicaciones) con e
     "modulo": {
         "codigo": "código detectado o sugerido (ej: MOD_01, MOD_02)",
         "titulo": "título del módulo",
-        "duracion_total": número de horas totales
+        "duracion_total": número de horas totales,
+        "idioma": "código ISO 639-1 del idioma del documento (es, en, fr, pt, de, it, etc.)"
     },
     "unidades": [
         {
@@ -177,6 +178,7 @@ PROMPT
 // ENFOQUE: Diseñador instruccional e-learning con reglas claras de fidelidad
 define('PROMPT_STRUCTURE_UNIT', <<<'PROMPT'
 Eres un DISEÑADOR INSTRUCCIONAL EXPERTO en e-learning. Tu trabajo es ORGANIZAR contenido existente en una EXPERIENCIA DE APRENDIZAJE INTERACTIVA para SCORM, eligiendo el mejor componente visual para cada fragmento.
+{language_instruction}
 
 UNIDAD: {unit_title}
 
@@ -350,6 +352,7 @@ PROMPT
 
 define('PROMPT_QUESTIONS', <<<'PROMPT'
 Eres un experto en evaluación educativa. Genera preguntas de autoevaluación para la siguiente unidad didáctica.
+{language_instruction}
 
 UNIDAD: {unit_title}
 CONTENIDO: {unit_content}

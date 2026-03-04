@@ -100,7 +100,11 @@ try {
     if ($useAI) {
         try {
             $aiProcessor = new AIProcessor();
-            
+
+            // Detectar idioma del documento y configurar el procesador IA
+            $detectedLang = detectLanguage($documentData['text']);
+            $aiProcessor->setLanguage($detectedLang);
+
             // ============================================================
             // NUEVO FLUJO: Estructuración por unidades
             // 1. Detectar unidades (desde estructura del Word)
@@ -288,7 +292,8 @@ try {
                     'modulo' => [
                         'codigo' => $moduleCode,
                         'titulo' => $moduleTitle,
-                        'duracion_total' => $totalHours
+                        'duracion_total' => $totalHours,
+                        'idioma' => detectLanguage($documentData['text'])
                     ],
                     'unidades' => $units
                 ];
@@ -423,7 +428,8 @@ function buildBasicAnalysis(array $structure, array $documentData, array $codeBl
         'modulo' => [
             'codigo' => $moduleCode,
             'titulo' => cleanBasicTitle($moduleTitle),
-            'duracion_total' => $totalHours
+            'duracion_total' => $totalHours,
+            'idioma' => detectLanguage($documentData['text'])
         ],
         'unidades' => $units
     ];
@@ -779,4 +785,37 @@ function enrichSectionsWithRealContent(array $secciones, string $unitContent): a
     }
     
     return $secciones;
+}
+
+/**
+ * Detecta el idioma del texto con heurística simple (palabras frecuentes)
+ */
+function detectLanguage(string $text): string
+{
+    $sample = mb_strtolower(mb_substr($text, 0, 5000));
+
+    // Palabras muy comunes por idioma (sin acentos para simplificar)
+    $markers = [
+        'en' => ['the ', ' and ', ' is ', ' are ', ' of ', ' to ', ' in ', ' that ', ' for ', ' with ', ' this ', ' from ', ' have ', ' will ', ' can '],
+        'es' => [' de ', ' los ', ' las ', ' del ', ' una ', ' con ', ' para ', ' por ', ' que ', ' esta ', ' como ', ' son ', ' tiene ', ' puede ', ' cada '],
+        'fr' => [' les ', ' des ', ' une ', ' est ', ' dans ', ' pour ', ' avec ', ' sont ', ' cette ', ' peut '],
+        'pt' => [' dos ', ' das ', ' uma ', ' com ', ' para ', ' que ', ' esta ', ' pode ', ' mais ', ' como '],
+        'de' => [' die ', ' der ', ' und ', ' den ', ' das ', ' ist ', ' von ', ' mit ', ' auf ', ' ein '],
+        'it' => [' che ', ' del ', ' della ', ' con ', ' per ', ' una ', ' sono ', ' questo ', ' come ', ' nella '],
+    ];
+
+    $scores = [];
+    foreach ($markers as $lang => $words) {
+        $count = 0;
+        foreach ($words as $w) {
+            $count += substr_count($sample, $w);
+        }
+        $scores[$lang] = $count;
+    }
+
+    arsort($scores);
+    $best = key($scores);
+
+    // Si no hay confianza suficiente, asumir español
+    return ($scores[$best] >= 5) ? $best : 'es';
 }

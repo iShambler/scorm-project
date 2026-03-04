@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php -l includes/Lang.php)",
+      "Bash(php -l includes/PDFGenerator.php)",
+      "Bash(php -l includes/SCORMGenerator.php)",
+      "Bash(php -l includes/AIProcessor.php)",
+      "Bash(php -l api/analyze.php)",
+      "Bash(php -l api/generate.php)",
+      "Bash(php -l api/generate_pdf.php)",
+      "Bash(php -l config.php)",
+      "Bash(/c/xampp99/php/php.exe -l includes/SCORMGenerator.php)",
+      "Bash(/c/xampp99/php/php.exe -l includes/Lang.php)"
+    ]
+  }
+}
