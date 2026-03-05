@@ -319,18 +319,16 @@ class SCORMGenerator
                         ];
                     }
                 } else {
-                    // Fallback: texto plano con formateo regex
+                    // Fallback: convertir texto plano a bloques básicos
                     $content = $sec['contenido'] ?? '';
-                    $parts = $this->splitContent($content, 3000);
-                    foreach ($parts as $pi => $part) {
-                        $pid = $secId . ($pi > 0 ? '_' . ($pi + 1) : '');
-                        $isFirst = ($pi === 0);
-                        $fc = $this->formatContentRich($part);
+                    if (!empty($content)) {
+                        $fallbackBlocks = $this->textToBasicBlocks($content);
+                        $fc = $this->renderBlocks($fallbackBlocks);
                         $steps[] = [
-                            'id' => $pid,
-                            'label' => $isFirst ? $udN . '.' . $sn . '. ' . $sec['titulo'] : $udN . '.' . $sn . '.',
-                            'epi' => true, 'hide' => !$isFirst,
-                            'html' => $this->wrapStep($pid, true, true,
+                            'id' => $secId,
+                            'label' => $udN . '.' . $sn . '. ' . $sec['titulo'],
+                            'epi' => true, 'hide' => false,
+                            'html' => $this->wrapStep($secId, true, true,
                                 $secHeader . '<div class="content-body">' . $fc . '</div>')
                         ];
                     }
@@ -487,6 +485,61 @@ class SCORMGenerator
     // =====================================================================
     //  CONVERT contenido_estructurado → bloques (bridge between formats)
     // =====================================================================
+    /**
+     * Convierte texto plano a bloques básicos (fallback cuando la IA no genera contenido_estructurado).
+     * Divide en párrafos y detecta patrones simples (listas con -, bullets con •, etc.)
+     */
+    private function textToBasicBlocks(string $text): array
+    {
+        $blocks = [];
+        $paragraphs = preg_split('/\n{2,}/', trim($text));
+
+        foreach ($paragraphs as $para) {
+            $para = trim($para);
+            if (empty($para)) continue;
+
+            $lines = explode("\n", $para);
+
+            // Detectar si es una lista (líneas que empiezan con -, •, *, número.)
+            $listItems = [];
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if (preg_match('/^[-•*]\s+(.+)/', $line, $m)) {
+                    $listItems[] = $m[1];
+                } elseif (preg_match('/^\d+[.)]\s+(.+)/', $line, $m)) {
+                    $listItems[] = $m[1];
+                }
+            }
+
+            if (count($listItems) >= 2) {
+                $blocks[] = ['tipo' => 'lista', 'items' => $listItems];
+            } else {
+                // Párrafo normal, limitar tamaño
+                $text = implode(' ', $lines);
+                if (mb_strlen($text) > 600) {
+                    // Dividir en frases
+                    $sentences = preg_split('/(?<=[.!?])\s+/', $text);
+                    $chunk = '';
+                    foreach ($sentences as $s) {
+                        if (mb_strlen($chunk . ' ' . $s) > 500 && !empty($chunk)) {
+                            $blocks[] = ['tipo' => 'parrafo', 'texto' => trim($chunk)];
+                            $chunk = $s;
+                        } else {
+                            $chunk .= (empty($chunk) ? '' : ' ') . $s;
+                        }
+                    }
+                    if (!empty($chunk)) {
+                        $blocks[] = ['tipo' => 'parrafo', 'texto' => trim($chunk)];
+                    }
+                } else {
+                    $blocks[] = ['tipo' => 'parrafo', 'texto' => $text];
+                }
+            }
+        }
+
+        return $blocks;
+    }
+
     private function convertStructuredToBlocks(array $structured): array
     {
         $blocks = [];

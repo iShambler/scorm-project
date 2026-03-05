@@ -602,10 +602,13 @@ class WordProcessor
     }
 
     /**
-     * Construye un outline estructurado jerárquico del documento.
-     * Detecta: TEMA/UNIDAD (nivel 1), secciones numeradas X.Y (nivel 2),
-     * subsecciones X.Y.Z o X.Y.a (nivel 3), y contenido bajo cada una.
-     * Devuelve un array que representa fielmente la estructura del Word.
+     * Construye un outline del documento dividiendo por TEMAs/UNIDADes.
+     * Estrategia robusta:
+     *   1. Detectar dónde acaba el TOC (índice) y empieza el contenido real
+     *   2. Dividir solo por TEMA/UNIDAD (nivel 1)
+     *   3. TODO el contenido entre TEMAs va a content[] sin parsear secciones
+     *   4. La IA (structureUnit) se encarga de organizar en secciones
+     * Esto garantiza que NUNCA se pierde contenido por mala detección de estructura.
      */
     public function buildStructuredOutline(): array
     {
@@ -614,178 +617,173 @@ class WordProcessor
             'units' => []
         ];
 
-        $currentUnit = null;
-        $currentSection = null;
-        $currentSubsection = null;
-        $foundFirstUnit = false;  // Para ignorar TOC
-        $seenUnitNumbers = [];    // Para no duplicar UDs del TOC
-
-        // Primer paso: buscar título del módulo y la línea "MÓDULO X"
+        // ── PASO 1: Detectar título del módulo ──
         foreach ($this->paragraphs as $para) {
             $text = trim($para['text']);
             if (empty($text)) continue;
-            
-            // Detectar línea "MÓDULO II" o "MÓDULO 2"
-            if (preg_match('/^M[OÓ]DULO\s+([IVXLCDM\d]+)\s*$/iu', $text)) {
-                continue; // Solo la etiqueta, no es el título
-            }
-            // Detectar título largo del módulo (heading antes del primer TEMA)
+
+            if (preg_match('/^M[OÓ]DULO\s+([IVXLCDM\d]+)\s*$/iu', $text)) continue;
+
             if (empty($outline['module_title']) && $para['is_heading'] && mb_strlen($text) > 15 && mb_strlen($text) < 200
                 && !preg_match('/^TEMA\s/i', $text) && !preg_match('/^\d+\./', $text)
                 && !preg_match('/^M[OÓ]DULO\s/i', $text)) {
                 $outline['module_title'] = trim($text);
             }
-            // Parar después de encontrar el primer TEMA
             if (preg_match('/^TEMA\s+\d/i', $text)) break;
         }
 
-        // Segundo paso: construir estructura real (ignorando TOC)
-        foreach ($this->paragraphs as $para) {
-            $text = trim($para['text']);
+        // ── PASO 2: Encontrar dónde empieza el contenido real (después del TOC) ──
+        $contentStartIdx = $this->detectContentStart();
+
+        // ── PASO 3: Recoger TODOS los TEMAs y su contenido ──
+        // Primero encontramos las posiciones de cada TEMA real (post-TOC)
+        $temaPositions = []; // [{index, number, title}]
+        for ($i = $contentStartIdx; $i < count($this->paragraphs); $i++) {
+            $text = trim($this->paragraphs[$i]['text']);
             if (empty($text)) continue;
 
-            // --- Detectar TEMA / UNIDAD DIDÁCTICA (nivel 1) ---
             if (preg_match('/^(?:TEMA|UNIDAD(?:\s+DID[AÁ]CTICA)?)\s*(\d+)\s*[:\-.]?\s*(.+)?/iu', $text, $m)) {
                 $unitNum = (int)$m[1];
                 $unitTitle = trim($m[2] ?? '');
-                
-                // Si ya vimos esta UD, es la repetición real (post-TOC) → reemplazar
-                if (in_array($unitNum, $seenUnitNumbers)) {
-                    // Flush anterior y empezar nueva con contenido real
-                    $this->flushSubsection($currentSubsection, $currentSection);
-                    $this->flushSection($currentSection, $currentUnit);
-                    // Eliminar la UD del TOC del outline
-                    $outline['units'] = array_filter($outline['units'], fn($u) => $u['number'] !== $unitNum);
-                    $outline['units'] = array_values($outline['units']);
-                    if ($currentUnit !== null && $currentUnit['number'] !== $unitNum) {
-                        $this->flushUnit($currentUnit, $outline);
-                    }
-                } else {
-                    $this->flushSubsection($currentSubsection, $currentSection);
-                    $this->flushSection($currentSection, $currentUnit);
-                    $this->flushUnit($currentUnit, $outline);
-                }
-                
-                $seenUnitNumbers[] = $unitNum;
-                $currentUnit = [
+
+                // Si ya existe un TEMA con este número, mantener el último (es el real, post-TOC)
+                $temaPositions = array_filter($temaPositions, fn($t) => $t['number'] !== $unitNum);
+                $temaPositions[] = [
+                    'index' => $i,
                     'number' => $unitNum,
-                    'title' => $unitTitle,
-                    'sections' => [],
-                    'content' => []
+                    'title' => $unitTitle
                 ];
-                $currentSection = null;
-                $currentSubsection = null;
-                $foundFirstUnit = true;
-                continue;
-            }
-
-            // Ignorar todo antes del primer TEMA real (= TOC, portada, etc)
-            if (!$foundFirstUnit) continue;
-
-            // --- Detectar subsección X.Y.Z o X.Y.a (nivel 3) --- ANTES que sección
-            if (preg_match('/^(\d+)\.(\d+)\.\s*([a-z])\s*\.?\s+(.+)$/iu', $text, $m)) {
-                $this->flushSubsection($currentSubsection, $currentSection);
-                $currentSubsection = [
-                    'id' => $m[1] . '.' . $m[2] . '.' . strtolower($m[3]),
-                    'title' => trim($m[4]),
-                    'content' => []
-                ];
-                continue;
-            }
-            // Variante: "4.3.a. Título" o "4.3.a Título"
-            if (preg_match('/^(\d+)\.(\d+)\.([a-z])\.?\s+(.+)$/iu', $text, $m)) {
-                $this->flushSubsection($currentSubsection, $currentSection);
-                $currentSubsection = [
-                    'id' => $m[1] . '.' . $m[2] . '.' . strtolower($m[3]),
-                    'title' => trim($m[4]),
-                    'content' => []
-                ];
-                continue;
-            }
-
-            // --- Detectar sección X.Y. (nivel 2) ---
-            if (preg_match('/^(\d+)\.(\d+)\.?\s+(.+)$/u', $text, $m)) {
-                // Verificar que no es subsection (X.Y.a) - ya manejado arriba
-                if (!preg_match('/^\d+\.\d+\.[a-z]/i', $text)) {
-                    $this->flushSubsection($currentSubsection, $currentSection);
-                    $this->flushSection($currentSection, $currentUnit);
-                    $currentSection = [
-                        'id' => $m[1] . '.' . $m[2],
-                        'title' => trim($m[3]),
-                        'subsections' => [],
-                        'content' => []
-                    ];
-                    $currentSubsection = null;
-                    continue;
-                }
-            }
-
-            // --- Acumular contenido en el nivel correcto ---
-            if ($currentSubsection !== null) {
-                $currentSubsection['content'][] = $text;
-            } elseif ($currentSection !== null) {
-                $currentSection['content'][] = $text;
-            } elseif ($currentUnit !== null) {
-                $currentUnit['content'][] = $text;
             }
         }
+        $temaPositions = array_values($temaPositions);
 
-        // Flush final
-        $this->flushSubsection($currentSubsection, $currentSection);
-        $this->flushSection($currentSection, $currentUnit);
-        $this->flushUnit($currentUnit, $outline);
+        // ── PASO 4: Recoger TODO el contenido entre cada TEMA y el siguiente ──
+        foreach ($temaPositions as $ti => $tema) {
+            $startIdx = $tema['index'] + 1; // Párrafo siguiente al título TEMA
+            $endIdx = isset($temaPositions[$ti + 1])
+                ? $temaPositions[$ti + 1]['index'] // Hasta el siguiente TEMA
+                : count($this->paragraphs);        // O hasta el final
 
-        // Fallback: si no detectó UDs con este método, usar detectStructure
+            $content = [];
+            for ($i = $startIdx; $i < $endIdx; $i++) {
+                $text = trim($this->paragraphs[$i]['text']);
+                if (!empty($text)) {
+                    $content[] = $text;
+                }
+            }
+
+            $outline['units'][] = [
+                'number' => $tema['number'],
+                'title' => $tema['title'],
+                'sections' => [],  // Vacío — la IA se encarga
+                'content' => $content
+            ];
+        }
+
+        // ── FALLBACK: si no detectó TEMAs, usar todo el contenido como 1 unidad ──
         if (empty($outline['units'])) {
             $structure = $this->detectStructure();
-            foreach ($structure['units'] as $su) {
-                $outline['units'][] = [
-                    'number' => $su['number'],
-                    'title' => $su['title'],
-                    'sections' => [],
-                    'content' => $su['content'] ?? []
-                ];
+            if (!empty($structure['units'])) {
+                foreach ($structure['units'] as $su) {
+                    $outline['units'][] = [
+                        'number' => $su['number'],
+                        'title' => $su['title'],
+                        'sections' => [],
+                        'content' => $su['content'] ?? []
+                    ];
+                }
+            } else {
+                // Último recurso: todo el texto como 1 unidad
+                $allContent = [];
+                foreach ($this->paragraphs as $para) {
+                    $text = trim($para['text']);
+                    if (!empty($text)) $allContent[] = $text;
+                }
+                if (!empty($allContent)) {
+                    $outline['units'][] = [
+                        'number' => 1,
+                        'title' => $outline['module_title'] ?: 'Contenido formativo',
+                        'sections' => [],
+                        'content' => $allContent
+                    ];
+                }
             }
             if (empty($outline['module_title'])) {
-                $outline['module_title'] = $structure['title'];
+                $outline['module_title'] = $structure['title'] ?? '';
             }
         }
+
+        logError('DEBUG buildOutline: ' . count($outline['units']) . ' units, contentStart=' . $contentStartIdx
+            . ', temaPositions=' . count($temaPositions)
+            . ', totalParagraphs=' . count($this->paragraphs));
 
         return $outline;
     }
 
-    private function flushSubsection(?array &$sub, ?array &$section): void
+    /**
+     * Detecta dónde acaba el TOC (índice) y empieza el contenido real.
+     * Heurística: el TOC son párrafos cortos numerados (tipo "3.1. Título...")
+     * agrupados antes del contenido largo. El contenido real empieza cuando
+     * encontramos un párrafo largo (>20 palabras) que NO es un título numerado.
+     */
+    private function detectContentStart(): int
     {
-        if ($sub !== null && $section !== null) {
-            $section['subsections'][] = $sub;
-        }
-        $sub = null;
-    }
+        $tocCandidates = 0;   // Cuántos párrafos cortos numerados hemos visto
+        $lastTemaIdx = 0;     // Último TEMA visto
 
-    private function flushSection(?array &$section, ?array &$unit): void
-    {
-        if ($section !== null && $unit !== null) {
-            $unit['sections'][] = $section;
-        }
-        $section = null;
-    }
+        for ($i = 0; $i < count($this->paragraphs); $i++) {
+            $text = trim($this->paragraphs[$i]['text']);
+            if (empty($text)) continue;
 
-    private function flushUnit(?array &$unit, array &$outline): void
-    {
-        if ($unit !== null) {
-            $outline['units'][] = $unit;
+            // ¿Es un heading TEMA/UNIDAD?
+            if (preg_match('/^(?:TEMA|UNIDAD(?:\s+DID[AÁ]CTICA)?)\s*\d+/iu', $text)) {
+                $lastTemaIdx = $i;
+                continue;
+            }
+
+            // ¿Es una entrada de TOC? (corta, numerada, sin punto final como frase)
+            $isTocEntry = $this->isTocEntry($text);
+            if ($isTocEntry) {
+                $tocCandidates++;
+                continue;
+            }
+
+            // Si hemos visto entradas de TOC y ahora encontramos contenido largo
+            // después de un TEMA, es el inicio del contenido real
+            $wordCount = str_word_count($text);
+            if ($tocCandidates >= 3 && $wordCount > 20 && $lastTemaIdx > 0) {
+                // El contenido real empieza desde el último TEMA que vimos
+                return $lastTemaIdx;
+            }
+
+            // Si encontramos un párrafo largo antes de ver TOC, no hay TOC
+            if ($tocCandidates === 0 && $wordCount > 30) {
+                return 0;
+            }
         }
-        $unit = null;
+
+        // Si no encontramos corte claro, empezar desde el principio
+        return 0;
     }
 
     /**
-     * Genera un texto estructurado legible del outline para pasar a la IA.
-     * Formato:
-     *   TEMA 4: Título
-     *     4.1. Sección
-     *       [contenido de la sección...]
-     *       4.1.a. Subsección
-     *         [contenido de la subsección...]
+     * Determina si un párrafo es una entrada de índice (TOC).
+     * Entradas de TOC: cortas, numeradas, sin punto final de frase.
+     */
+    private function isTocEntry(string $text): bool
+    {
+        $wordCount = str_word_count($text);
+        // Entrada numerada corta: "3.1. Introducción" o "3.4.a. Valoración previa"
+        $isNumbered = preg_match('/^\d+\.\d+/', $text);
+        $isShort = $wordCount < 15 && mb_strlen($text) < 120;
+        // No es una frase real (no termina con punto tras palabra larga)
+        $isNotSentence = !preg_match('/[a-záéíóúñ]{3,}\.\s*$/iu', $text);
+
+        return $isNumbered && $isShort && $isNotSentence;
+    }
+
+    /**
+     * Genera un texto legible del outline para pasar a la IA.
      */
     public function outlineToText(array $outline): string
     {

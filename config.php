@@ -132,14 +132,18 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown, sin explicaciones) con e
 }
 
 TIPOS DE BLOQUE para "contenido_estructurado":
-- "parrafo": texto explicativo (máx 4 frases)
+- "parrafo": texto explicativo (máx 4 frases). NUNCA más de 2 seguidos.
 - "definicion": término + definición (campos "termino" y "texto")
 - "lista": enumeración (campo "items" con texto COMPLETO de cada punto)
-- "tabla": datos tabulares (campo "filas", primera fila = cabecera)
+- "tabla": datos tabulares (campo "filas", primera fila = cabecera). DEFAULT para agrupar conceptos con nombre+descripción.
 - "importante": advertencia o punto crítico
 - "sabias_que": dato complementario o curioso
 - "ejemplo": caso práctico o ilustrativo
 - "comparativa": 2-4 elementos a contrastar (campo "items" con formato "Nombre: descripción")
+- "proceso": pasos secuenciales, protocolos, escalas (campo "items" formato "Título corto: explicación")
+
+REGLA ANTI-TOCHOS: Cada sección DEBE tener al menos 2 componentes interactivos (tabla/lista/comparativa/proceso/definicion/importante/sabias_que/ejemplo). Una sección de solo párrafos NO es e-learning, es un PDF.
+TODAS las secciones DEBEN usar "contenido_estructurado" con bloques tipados. NUNCA dejes secciones con solo texto plano.
 
 REGLAS CRÍTICAS:
 
@@ -147,8 +151,8 @@ REGLAS CRÍTICAS:
    - REGLA DE TAMAÑO: Cada unidad debe tener contenido SUSTANCIAL (mínimo ~1500 palabras o 3+ páginas). Si el documento entero es corto (menos de 5000 palabras / ~10 páginas), haz UNA SOLA UNIDAD con varias secciones.
    - Si el documento tiene capítulos/temas GRANDES (cada uno con 3+ páginas), cada capítulo = una unidad.
    - Si el documento tiene secciones numeradas PEQUEÑAS (1.1, 1.2, 1.3... cada una con pocos párrafos), esas secciones NO son unidades. Son SECCIONES dentro de una misma unidad.
-   - Las subsecciones del documento (ej: 4.3.a, 4.3.b) se convierten en secciones dentro de la unidad correspondiente.
-   - Si el documento NO tiene estructura clara, CREA una organización lógica dividiendo el contenido en 3-5 secciones por unidad.
+   - Las subsecciones del documento (ej: 4.3.a, 4.3.b) se convierten en secciones independientes si tienen contenido sustancial (más de 2 párrafos). NO las comprimas dentro de otra sección.
+   - Si el documento NO tiene estructura clara, CREA una organización lógica con tantas secciones como necesite el contenido (mínimo 3). NO limites artificialmente el número de secciones.
    - NUNCA crees unidades con menos de 2 secciones o con muy poco contenido. Es mejor tener 1-2 unidades ricas que 6 unidades vacías.
 
 2. CONTENIDO COMPLETO:
@@ -260,8 +264,10 @@ CRITERIO PARA ELEGIR COMPONENTE al agrupar:
 
 REGLAS DE DISEÑO:
 
-1. VARIEDAD VISUAL: Alterna tipos de bloque. Nunca más de 2 "parrafo" seguidos.
+1. VARIEDAD VISUAL OBLIGATORIA: Alterna tipos de bloque. PROHIBIDO más de 2 "parrafo" seguidos.
+   Si tienes 3+ párrafos seguidos, PARA y transforma alguno: extrae datos clave a una tabla, convierte una enumeración implícita en lista, destaca un dato en sabias_que, marca una advertencia como importante.
    Patrón ideal: parrafo → tabla → sabias_que → lista → parrafo...
+   Patrón PROHIBIDO: parrafo → parrafo → parrafo → parrafo (esto NO es e-learning, es un PDF)
 
    REGLA OBLIGATORIA PARA LISTAS: Toda "lista" DEBE ir precedida de un bloque "parrafo" cuya ÚLTIMA frase introduzca directamente los items (debe terminar con ":" o con una frase tipo "son los siguientes:", "se incluyen:", "se destacan:", etc.). NO basta con que haya un párrafo antes hablando del tema — ese párrafo debe ACABAR presentando la lista. Si el contenido original no tiene frase introductoria, créala a partir del contexto (ej: "Las áreas que evalúa la Escala de Gijón son:").
 
@@ -273,10 +279,18 @@ REGLAS DE DISEÑO:
 3. MÁX 2 "definicion" por sección. Si hay 3+, usa tabla o acordeón.
 
 4. ESTRUCTURA:
-   - 3-6 secciones por unidad, cada una con 4-8 bloques
-   - Empieza cada sección con un párrafo introductorio
+   - Tantas secciones como necesite el contenido (sin límite artificial). Si el Word tiene 8 secciones, genera 8. NO sacrifiques contenido para reducir secciones.
+   - Cada sección debe tener entre 4 y 10 bloques. Si una sección tiene más de 10 bloques, divídela en 2 secciones.
+   - Si una sección solo tendría 1-2 bloques (contenido muy corto), fusiónala con la sección anterior o siguiente.
+   - Empieza SIEMPRE cada sección con un bloque "parrafo" introductorio de 2-3 frases que contextualice lo que se va a ver.
    - Títulos de sección descriptivos y atractivos
    - icono_keyword específico ("gaming desktop rgb" mejor que "technology")
+
+   REGLA ANTI-TOCHOS (CRÍTICA):
+   - El SCORM NO es un documento de texto. Es una experiencia INTERACTIVA. Cada sección DEBE tener al menos 2 componentes interactivos (tabla, comparativa, proceso, lista, definicion, importante, sabias_que o ejemplo).
+   - Si una sección tiene 4+ párrafos seguidos, estás haciendo un documento de texto, NO un SCORM. Reorganiza: agrupa datos en tablas, convierte enumeraciones en listas, usa cajas destacadas para datos clave.
+   - Patrón MÍNIMO por sección: parrafo(intro) → componente interactivo → [parrafo transición] → componente interactivo → [cierre]
+   - NUNCA generes una sección con solo bloques "parrafo". Eso es un fallo grave de diseño instruccional.
 
 5. CONCEPTOS CLAVE (generan flashcards y juego de matching):
    - 5-8 términos REALES extraídos del contenido
@@ -289,10 +303,17 @@ EJEMPLO BUEN DISEÑO:
   Escala de valoración: parrafo(intro) → proceso([Criterio 1: descripción + puntuación, Criterio 2: descripción + puntuación, ...]) ← escala con criterios puntuados = proceso
   Protocolo de N pasos: parrafo(intro) → proceso([Paso 1: acción A, Paso 2: acción B, Paso 3: acción C]) ← fases secuenciales = proceso
 
-EJEMPLO MAL DISEÑO (evitar):
+EJEMPLO MAL DISEÑO (PROHIBIDO — si generas esto, el SCORM saldrá roto):
   proceso([CPU: es el cerebro, GPU: procesa gráficos, RAM: memoria]) = NO son pasos, son conceptos → usar tabla
   definicion(CPU) → definicion(GPU) → definicion(RAM) → lista([SSD, Placa]) = inconsistente
   parrafo, parrafo, parrafo, parrafo = documento de texto, no e-learning
+  Sección con solo texto plano sin ningún componente interactivo = FALLO GRAVE
+
+REGLA TÉCNICA CRÍTICA:
+- TODAS las secciones DEBEN tener el campo "contenido_estructurado" con un array de bloques.
+- Cada bloque DEBE tener el campo "tipo" con uno de los valores válidos: parrafo, definicion, lista, tabla, comparativa, proceso, importante, sabias_que, ejemplo.
+- NO dejes secciones con solo "contenido" (texto plano). SIEMPRE usa "contenido_estructurado" con bloques tipados.
+- Si no sabes qué tipo usar para un fragmento → usa "tabla" como default para datos, "lista" para enumeraciones, "importante" para advertencias.
 
 OBJETIVOS DE APRENDIZAJE (Taxonomía de Bloom):
 Genera 3-4 objetivos. Cada uno DEBE empezar con su nivel de Bloom entre corchetes, seguido de un verbo de acción específico de ese nivel:
