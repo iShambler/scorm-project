@@ -89,10 +89,12 @@ class WordProcessor
      */
     private function parseDocumentXml(string $xml): void
     {
-        // Limpiar el XML
+        // Limpiar el XML: eliminar namespaces de tags y atributos
         $xml = preg_replace('/xmlns[^=]*="[^"]*"/', '', $xml);
         $xml = preg_replace('/<[a-zA-Z]+:/', '<', $xml);
         $xml = preg_replace('/<\/[a-zA-Z]+:/', '</', $xml);
+        // Eliminar prefijos de atributos (r:embed → embed, w:val → val)
+        $xml = preg_replace('/(\s)[a-zA-Z]+:([a-zA-Z]+)=/', '$1$2=', $xml);
         
         $dom = new DOMDocument();
         @$dom->loadXML($xml);
@@ -825,7 +827,13 @@ class WordProcessor
     {
         $blips = $drawingNode->getElementsByTagName('blip');
         if ($blips->length > 0) {
-            $embed = $blips->item(0)->getAttribute('embed');
+            $blip = $blips->item(0);
+            // El atributo puede ser "embed" o "r:embed" (el namespace stripping
+            // solo afecta a tags, no a atributos con prefijo)
+            $embed = $blip->getAttribute('embed');
+            if (empty($embed)) {
+                $embed = $blip->getAttribute('r:embed');
+            }
             if (!empty($embed)) {
                 return $embed;
             }
@@ -859,6 +867,18 @@ class WordProcessor
      * Guarda las imágenes extraídas en un directorio
      * @return array Mapa de filename => ruta guardada
      */
+    public function getExtractedImages(): array
+    {
+        return array_map(function($img) {
+            return ['filename' => $img['filename'], 'rId' => $img['rId'], 'size' => $img['size']];
+        }, $this->images);
+    }
+
+    public function getRawImagePositions(): array
+    {
+        return $this->imagePositions;
+    }
+
     public function saveImagesToDir(string $dir): array
     {
         if (!is_dir($dir)) {
@@ -875,5 +895,83 @@ class WordProcessor
             ];
         }
         return $saved;
+    }
+
+    /**
+     * Inyecta texto extraído de imágenes como párrafos reales.
+     * Reemplaza placeholders [IMAGEN: x] por el texto extraído vía Vision API.
+     * También actualiza rawText para que la IA tenga contenido.
+     */
+    public function injectExtractedImageText(array $imageTexts): void
+    {
+        $injectedText = [];
+        $usedFilenames = [];
+
+        // 1. Reemplazar placeholders existentes [IMAGEN: filename]
+        foreach ($this->paragraphs as &$para) {
+            if (($para['style'] ?? '') === 'ImagePlaceholder') {
+                if (preg_match('/\[IMAGEN:\s*([^\]]+)\]/', $para['text'], $m)) {
+                    $filename = trim($m[1]);
+                    if (isset($imageTexts[$filename]) && !empty($imageTexts[$filename])) {
+                        $text = $imageTexts[$filename];
+                        $para['text'] = $text;
+                        $para['style'] = '';
+                        $para['is_heading'] = false;
+                        $para['is_list'] = false;
+                        unset($para['image_rId']);
+                        $injectedText[] = $text;
+                        $usedFilenames[$filename] = true;
+                    }
+                }
+            }
+        }
+        unset($para);
+
+        // 2. Imágenes sin placeholder (no se detectó posición en XML pero sí se extrajo texto)
+        foreach ($imageTexts as $filename => $text) {
+            if (!isset($usedFilenames[$filename]) && !empty($text)) {
+                $this->paragraphs[] = [
+                    'text' => $text,
+                    'style' => '',
+                    'is_heading' => false,
+                    'is_list' => false
+                ];
+                $injectedText[] = $text;
+            }
+        }
+
+        // 3. Actualizar rawText con todo el texto inyectado
+        if (!empty($injectedText)) {
+            $this->rawText = trim($this->rawText . "\n\n" . implode("\n\n", $injectedText));
+        }
+    }
+
+    /**
+     * Comprueba si el documento es mayoritariamente imágenes (poco texto, muchas imágenes)
+     */
+    public function isImageHeavyDocument(): bool
+    {
+        $imageCount = count($this->images);
+        if ($imageCount === 0) return false;
+
+        $textLen = strlen($this->rawText);
+        $textParas = 0;
+        $imgParas = 0;
+
+        foreach ($this->paragraphs as $para) {
+            if (($para['style'] ?? '') === 'ImagePlaceholder') {
+                $imgParas++;
+            } elseif (!empty(trim($para['text']))) {
+                $textParas++;
+            }
+        }
+
+        // Documento mayoritariamente imágenes si:
+        // 1. Hay imágenes y muy poco texto (<500 chars), o
+        // 2. Hay más placeholders de imagen que párrafos de texto, o
+        // 3. Hay muchas imágenes extraídas pero poco texto proporcional
+        return ($imageCount > 0 && $textLen < 500)
+            || ($imgParas > 0 && $imgParas >= $textParas)
+            || ($imageCount >= 5 && $textLen < $imageCount * 200);
     }
 }

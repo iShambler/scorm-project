@@ -33,7 +33,7 @@ if (file_exists($envFile)) {
 
 define('CLAUDE_API_KEY', $_ENV['CLAUDE_API_KEY'] ?? 'tu-api-key-aqui');
 define('CLAUDE_MODEL', 'claude-sonnet-4-20250514');
-define('CLAUDE_MAX_TOKENS', 16000);
+define('CLAUDE_MAX_TOKENS', 64000);
 
 // =============================================
 // BASE DE DATOS (MySQL)
@@ -486,6 +486,26 @@ PROMPT
 );
 
 define('MAX_IMAGE_SIZE_VISION', 5242880); // 5MB máximo por imagen para Vision API
+
+// Prompt para extraer texto de imágenes cuando el Word es mayoritariamente imágenes (OCR-like)
+define('PROMPT_EXTRACT_TEXT_FROM_IMAGE', <<<'PROMPT'
+Extrae TODO el texto visible en esta imagen de un documento educativo/formativo.
+
+INSTRUCCIONES:
+1. Transcribe el texto tal cual aparece, manteniendo el orden de lectura (arriba-abajo, izquierda-derecha).
+2. Si es una tabla, represéntala con líneas separadas. Cada fila en una línea, columnas separadas por " | ".
+3. Si es un diagrama de flujo o esquema, describe la estructura con indentación:
+   - Nodo principal
+     - Rama A → resultado
+     - Rama B → resultado
+4. Si hay títulos o encabezados, márcalos con MAYÚSCULAS o anteponiendo "## ".
+5. Si algún texto no es legible con certeza, escríbelo seguido de " [VERIFICAR]".
+6. NO añadas interpretaciones ni resúmenes. Solo transcribe lo visible.
+7. Si la imagen es puramente decorativa (foto genérica, logo, icono sin texto relevante), responde solo: [DECORATIVA]
+
+Responde ÚNICAMENTE con el texto extraído, sin formato JSON, sin markdown con backticks.
+PROMPT
+);
 
 // =============================================
 // FUNCIONES AUXILIARES

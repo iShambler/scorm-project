@@ -14,7 +14,8 @@
       "Bash(/c/xampp99/php/php.exe -l c:/xampp99/htdocs/scorm-project/includes/WordProcessor.php)",
       "Bash(/c/xampp99/php/php.exe -l c:/xampp99/htdocs/scorm-project/includes/AIProcessor.php)",
       "Bash(/c/xampp99/php/php.exe -l c:/xampp99/htdocs/scorm-project/includes/SCORMGenerator.php)",
-      "Bash(/c/xampp99/php/php.exe -l c:/xampp99/htdocs/scorm-project/config.php)"
+      "Bash(/c/xampp99/php/php.exe -l c:/xampp99/htdocs/scorm-project/config.php)",
+      "Bash(/c/xampp99/php/php.exe -r \":*)"
     ]
   }
 }

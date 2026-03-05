@@ -57,8 +57,8 @@ class AIProcessor
     public function analyzeDocument(string $content): array
     {
         // Limitar contenido para no exceder tokens
-        $content = $this->truncateContent($content, 15000);
-        
+        $content = $this->truncateContent($content, 100000);
+
         $prompt = str_replace('{content}', $content, PROMPT_ANALYZE);
         
         $response = $this->callAPI($prompt);
@@ -85,7 +85,7 @@ class AIProcessor
         
         $prompt = PROMPT_QUESTIONS;
         $prompt = str_replace('{unit_title}', $unitTitle, $prompt);
-        $prompt = str_replace('{unit_content}', $this->truncateContent($unitContent, 5000), $prompt);
+        $prompt = str_replace('{unit_content}', $this->truncateContent($unitContent, 80000), $prompt);
         $prompt = str_replace('{concepts}', $conceptsText, $prompt);
         $prompt = str_replace('{language_instruction}', $this->getLanguageInstruction(), $prompt);
         
@@ -104,7 +104,7 @@ class AIProcessor
 Analiza el siguiente contenido educativo y genera exactamente {$count} flashcards (tarjetas de estudio) con los conceptos más importantes.
 
 CONTENIDO:
-{$this->truncateContent($content, 6000)}
+{$this->truncateContent($content, 80000)}
 
 Responde ÚNICAMENTE con un JSON válido:
 {
@@ -135,12 +135,12 @@ PROMPT;
     {
         $prompt = PROMPT_STRUCTURE_UNIT;
         $prompt = str_replace('{unit_title}', $unitTitle, $prompt);
-        $prompt = str_replace('{unit_content}', $this->truncateContent($unitContent, 25000), $prompt);
+        $prompt = str_replace('{unit_content}', $this->truncateContent($unitContent, 120000), $prompt);
         $prompt = str_replace('{language_instruction}', $this->getLanguageInstruction(), $prompt);
-        
+
         $response = $this->callAPI($prompt);
         $data = $this->parseJsonResponse($response);
-        
+
         return $data;
     }
 
@@ -152,7 +152,7 @@ PROMPT;
     {
         $prompt = PROMPT_RESTRUCTURE;
         $prompt = str_replace('{unit_title}', $unitTitle, $prompt);
-        $prompt = str_replace('{unit_content}', $this->truncateContent($unitContent, 25000), $prompt);
+        $prompt = str_replace('{unit_content}', $this->truncateContent($unitContent, 120000), $prompt);
         $prompt = str_replace('{unit_number}', (string)$unitNumber, $prompt);
 
         $response = $this->callAPI($prompt);
@@ -171,7 +171,7 @@ PROMPT;
         $prompt = PROMPT_ENRICH_SECTIONS;
         $prompt = str_replace('{unit_title}', $unitTitle, $prompt);
         $prompt = str_replace('{section_titles}', $sectionTitles, $prompt);
-        $prompt = str_replace('{unit_content}', $this->truncateContent($unitContent, 20000), $prompt);
+        $prompt = str_replace('{unit_content}', $this->truncateContent($unitContent, 120000), $prompt);
         
         $response = $this->callAPI($prompt);
         $data = $this->parseJsonResponse($response);
@@ -190,7 +190,7 @@ Resume el siguiente contenido educativo de forma clara y estructurada para un cu
 CONTEXTO: {$context}
 
 CONTENIDO:
-{$this->truncateContent($content, 4000)}
+{$this->truncateContent($content, 80000)}
 
 Genera un resumen educativo de 3-5 párrafos que:
 - Sea claro y fácil de entender
@@ -212,6 +212,18 @@ PROMPT;
      * @param string $context   Texto circundante del documento
      * @return array {clasificacion, confianza, descripcion_breve, bloques[]}
      */
+    /**
+     * Extrae texto de una imagen usando Vision API (OCR-like)
+     * Para documentos Word que son mayoritariamente imágenes/capturas
+     */
+    public function extractTextFromImage(array $imageData): string
+    {
+        $base64 = base64_encode($imageData['data']);
+        $mime = $imageData['mime'];
+        $response = $this->callVisionAPI($base64, $mime, PROMPT_EXTRACT_TEXT_FROM_IMAGE);
+        return trim($response);
+    }
+
     public function classifyImage(array $imageData, string $context = ''): array
     {
         $base64 = base64_encode($imageData['data']);

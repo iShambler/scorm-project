@@ -20,8 +20,8 @@ $auth->requireLogin();
 // Capturar errores PHP para no romper JSON
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
-ini_set('max_execution_time', 600); // 10 min para documentos grandes
-set_time_limit(600);
+ini_set('max_execution_time', 0); // Sin límite — docs con imágenes requieren muchas llamadas Vision API
+set_time_limit(0);
 header('Content-Type: application/json; charset=utf-8');
 
 // Capturar errores fatales
@@ -106,12 +106,50 @@ try {
             $aiProcessor->setLanguage($detectedLang);
 
             // ============================================================
-            // NUEVO FLUJO: Estructuración por unidades
+            // VISION OCR: Si el documento es mayoritariamente imágenes,
+            // extraer texto de cada imagen ANTES de analizar estructura.
+            // Esto permite que documentos escaneados/capturados se procesen.
+            // ============================================================
+            if ($wordProcessor->isImageHeavyDocument()) {
+                $allImages = $wordProcessor->getImages();
+                $imageTexts = [];
+                logError('DEBUG vision-ocr: document is image-heavy (' . count($allImages) . ' images, text=' . strlen($documentData['text']) . ' chars). Extracting text via Vision API...');
+
+                foreach ($allImages as $img) {
+                    if ($img['size'] > MAX_IMAGE_SIZE_VISION) {
+                        logError('DEBUG vision-ocr: ' . $img['filename'] . ' skipped (too large)');
+                        continue;
+                    }
+                    try {
+                        $extractedText = $aiProcessor->extractTextFromImage($img);
+                        if (!empty($extractedText) && $extractedText !== '[DECORATIVA]') {
+                            $imageTexts[$img['filename']] = $extractedText;
+                            logError('DEBUG vision-ocr: ' . $img['filename'] . ' -> ' . strlen($extractedText) . ' chars extracted');
+                        } else {
+                            logError('DEBUG vision-ocr: ' . $img['filename'] . ' -> decorativa/vacía, skipped');
+                        }
+                    } catch (\Exception $ve) {
+                        logError('Error vision-ocr ' . $img['filename'] . ': ' . $ve->getMessage());
+                    }
+                }
+
+                if (!empty($imageTexts)) {
+                    $wordProcessor->injectExtractedImageText($imageTexts);
+                    // Refrescar datos del documento con el texto inyectado
+                    $documentData['text'] = $wordProcessor->getRawText();
+                    $documentData['char_count'] = strlen($documentData['text']);
+                    $documentData['word_count'] = str_word_count($documentData['text']);
+                    logError('DEBUG vision-ocr: injected text from ' . count($imageTexts) . ' images. New text length: ' . strlen($documentData['text']) . ' chars');
+                }
+            }
+
+            // ============================================================
+            // FLUJO PRINCIPAL: Estructuración por unidades
             // 1. Detectar unidades (desde estructura del Word)
             // 2. Por cada UD → structureUnit() (la IA organiza en secciones+bloques)
             // 3. Por cada UD → generateQuestions()
             // ============================================================
-            
+
             // Paso 1: Obtener unidades del Word con su contenido
             $outline = $wordProcessor->buildStructuredOutline();
             logError('DEBUG outline: ' . count($outline['units']) . ' units detected, module="' . $outline['module_title'] . '"');
@@ -123,6 +161,7 @@ try {
             // ============================================================
             $convertedImageBlocks = [];
             $imagePositions = $wordProcessor->getImagePositions();
+            logError('DEBUG vision: imagePositions count=' . count($imagePositions) . ', images count=' . count($wordProcessor->getExtractedImages()) . ', rawPositions count=' . count($wordProcessor->getRawImagePositions()));
 
             if (!empty($imagePositions)) {
                 logError('DEBUG vision: ' . count($imagePositions) . ' positioned images to process');
