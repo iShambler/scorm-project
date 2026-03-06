@@ -219,25 +219,10 @@ try {
                 }
             }
 
-            // Inyectar bloques convertidos en el outline (reemplazar placeholders [IMAGEN: x])
-            if (!empty($convertedImageBlocks)) {
-                logError('DEBUG vision: injecting ' . count($convertedImageBlocks) . ' converted images into outline');
-                foreach ($outline['units'] as &$ou) {
-                    $ou['content'] = injectImageBlocksIntoContent($ou['content'] ?? [], $convertedImageBlocks);
-                    foreach ($ou['sections'] as &$sec) {
-                        $sec['content'] = injectImageBlocksIntoContent($sec['content'] ?? [], $convertedImageBlocks);
-                        foreach ($sec['subsections'] as &$sub) {
-                            $sub['content'] = injectImageBlocksIntoContent($sub['content'] ?? [], $convertedImageBlocks);
-                        }
-                    }
-                }
-                unset($ou, $sec, $sub);
-            }
-
             // ============================================================
-            // REESTRUCTURACIÓN: La IA reorganiza el texto crudo de cada UD
-            // antes del análisis. Mejora párrafos, definiciones, listas, etc.
-            // Mantiene la numeración original del documento.
+            // REESTRUCTURACIÓN: La IA reorganiza el texto crudo de cada UD.
+            // IMPORTANTE: Vision injection va DESPUÉS del restructure, no antes.
+            // Si inyectamos antes, restructureUnit() borra el contenido de imágenes.
             // ============================================================
             if (!empty($outline['units'])) {
                 foreach ($outline['units'] as &$ou) {
@@ -258,6 +243,56 @@ try {
                     }
                 }
                 unset($ou);
+            }
+
+            // ============================================================
+            // VISION INJECTION (post-restructure): Inyectar contenido de
+            // imágenes DESPUÉS de restructureUnit para que no se pierda.
+            // Estrategia: buscar placeholder en content[], si restructure lo
+            // borró, añadir el texto al final de la UD correspondiente.
+            // ============================================================
+            if (!empty($convertedImageBlocks)) {
+                logError('DEBUG vision: injecting ' . count($convertedImageBlocks) . ' converted images (post-restructure)');
+                $allParagraphsForPos = $wordProcessor->getParagraphs();
+                $totalParas = count($allParagraphsForPos);
+
+                foreach ($convertedImageBlocks as $filename => $block) {
+                    // Convertir bloques de imagen a texto plano
+                    $imageLines = [];
+                    foreach ($block['bloques'] as $blk) {
+                        $t = blockToTextRepresentation($blk);
+                        if (!empty(trim($t))) $imageLines[] = $t;
+                    }
+                    if (empty($imageLines)) {
+                        logError('DEBUG vision: ' . $filename . ' skip — bloques vacíos tras conversión');
+                        continue;
+                    }
+                    $imageText = implode("\n", $imageLines);
+
+                    // Buscar la UD que contiene el placeholder [IMAGEN: filename]
+                    $injected = false;
+                    foreach ($outline['units'] as &$ou) {
+                        foreach ($ou['content'] as $idx => $line) {
+                            if (strpos($line, '[IMAGEN: ' . $filename . ']') !== false) {
+                                $ou['content'][$idx] = $imageText;
+                                $injected = true;
+                                logError('DEBUG vision: injected ' . $filename . ' into UD' . ($ou['number'] ?? '?') . ' (placeholder found)');
+                                break 2;
+                            }
+                        }
+                    }
+                    unset($ou);
+
+                    // Placeholder no encontrado (restructure lo eliminó) →
+                    // añadir al final de la UD correspondiente por posición
+                    if (!$injected) {
+                        $paraIdx = $block['paragraph_index'];
+                        $fraction = $totalParas > 0 ? $paraIdx / $totalParas : 0;
+                        $targetIdx = min(count($outline['units']) - 1, (int)floor($fraction * count($outline['units'])));
+                        $outline['units'][$targetIdx]['content'][] = $imageText;
+                        logError('DEBUG vision: injected ' . $filename . ' into UD' . ($outline['units'][$targetIdx]['number'] ?? $targetIdx + 1) . ' (fallback by position, para=' . $paraIdx . ')');
+                    }
+                }
             }
 
             // ============================================================

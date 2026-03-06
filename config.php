@@ -443,25 +443,30 @@ PROMPT
 
 // Prompt para clasificar y convertir imágenes del Word a bloques estructurados (Vision API)
 define('PROMPT_CLASSIFY_IMAGE', <<<'PROMPT'
-Eres un experto en diseño instruccional para e-learning. Analiza esta imagen de un documento educativo y conviértela en contenido HTML estructurado.
+Eres un experto en diseño instruccional para e-learning. Analiza esta imagen de un documento educativo y conviértela en contenido estructurado.
 {language_instruction}
 
 CONTEXTO del documento donde aparece la imagen:
 {context}
 
-PASO 1 — CLASIFICA la imagen en UNA de estas categorías:
+PASO 1 — CLASIFICA la imagen. Sigue esta regla ANTES de cualquier otra:
+
+REGLA PRINCIPAL: Si la imagen contiene CUALQUIER texto educativo visible (palabras, números, etiquetas, títulos, instrucciones, datos), NO es decorativa. Solo es DECORATIVA si es una fotografía de personas/objetos/paisajes SIN texto educativo relevante.
+
+Categorías:
 - TABLA_CLINICA: tabla con datos, escalas, puntuaciones, criterios, clasificaciones
-- ALGORITMO: diagrama de flujo, árbol de decisión, flujograma con pasos secuenciales
-- ESQUEMA: mapa conceptual, diagrama de relaciones, esquema jerárquico, infografía
+- ALGORITMO: diagrama de flujo, árbol de decisión, flujograma con pasos secuenciales  
+- ESQUEMA: mapa conceptual, diagrama de relaciones/anillos/jerárquico, infografía, rueda/círculo con texto
+- LISTA_ILUSTRADA: lista numerada o con viñetas acompañada de ilustraciones o iconos (ej: ejercicios físicos numerados, pasos con dibujos)
 - FORMULARIO: formulario, ficha de registro, plantilla a rellenar
 - GRAFICO: gráfico estadístico (barras, líneas, circular, dispersión)
-- DECORATIVA: foto decorativa, ilustración genérica, logo, icono sin información educativa
+- DECORATIVA: fotografía sin texto educativo (foto de persona, paisaje, objeto decorativo). NUNCA usar si la imagen tiene texto, números, etiquetas o instrucciones visibles.
 
-PASO 2 — CONVIERTE el contenido de la imagen en bloques estructurados.
+PASO 2 — CONVIERTE el contenido en bloques estructurados. Transcribe TODO el texto visible.
 
 Responde ÚNICAMENTE con JSON válido (sin markdown, sin ```):
 {
-    "clasificacion": "TABLA_CLINICA|ALGORITMO|ESQUEMA|FORMULARIO|GRAFICO|DECORATIVA",
+    "clasificacion": "TABLA_CLINICA|ALGORITMO|ESQUEMA|LISTA_ILUSTRADA|FORMULARIO|GRAFICO|DECORATIVA",
     "confianza": 0.0-1.0,
     "descripcion_breve": "descripción de 1 línea de lo que muestra la imagen",
     "bloques": []
@@ -471,38 +476,40 @@ REGLAS DE CONVERSIÓN POR CATEGORÍA:
 
 TABLA_CLINICA → tipo "tabla":
 {"tipo": "tabla", "filas": [["Columna1", "Columna2"], ["dato1", "dato2"]]}
-- Transcribe TODAS las filas y columnas visibles.
-- Si hay valores numéricos (puntuaciones, rangos), inclúyelos exactos.
-- Si un valor no es legible con certeza, escríbelo seguido de " [VERIFICAR]".
+- Transcribe TODAS las filas y columnas visibles con sus valores exactos.
 
 ALGORITMO → tipo "proceso":
 {"tipo": "proceso", "items": ["Paso 1: descripción completa", "Paso 2: si X entonces Y"]}
-- Convierte cada nodo/decisión del diagrama en un paso.
-- Para bifurcaciones: "Si [condición] → [resultado A]. Si no → [resultado B]"
+- Convierte cada nodo/decisión en un paso. Para bifurcaciones: "Si [condición] → [A]. Si no → [B]"
 
-ESQUEMA → combinación de bloques:
-- Si es jerárquico: {"tipo": "lista", "titulo": "Concepto central", "items": ["Subcategoría 1: detalle", "Subcategoría 2: detalle"]}
-- Si tiene categorías con descripciones: {"tipo": "tabla", "filas": [["Concepto", "Descripción"], ...]}
+ESQUEMA → combinación de bloques según su estructura:
+- Diagrama de anillos concéntricos o rueda (ej: COM-B): una tabla con columnas [Capa/Nivel, Elementos] donde cada fila es una capa del diagrama con todos sus elementos listados
+- Mapa jerárquico: {"tipo": "lista", "titulo": "Concepto central", "items": ["Subcategoría 1: detalle", "Subcategoría 2: detalle"]}
+- Infografía con conceptos y descripciones: {"tipo": "tabla", "filas": [["Concepto", "Descripción"], ...]}
+
+LISTA_ILUSTRADA → tipo "proceso" o "lista":
+- Si los items son instrucciones/ejercicios con pasos o descripción detallada: {"tipo": "proceso", "items": ["Ejercicio 1 - Nombre: descripción completa. Series: X. Repeticiones: Y", ...]}
+- Si son items simples: {"tipo": "lista", "titulo": "título de la lista", "items": ["item 1 completo", "item 2 completo"]}
+- TRANSCRIBE el texto de CADA item aunque haya ilustraciones; el texto es lo importante.
 
 FORMULARIO → tipo "tabla":
-{"tipo": "tabla", "filas": [["Campo", "Descripción/Instrucción"], ["Nombre", "Introducir nombre completo"]]}
-- Transcribe cada campo del formulario como fila.
+{"tipo": "tabla", "filas": [["Campo", "Descripción"], ["Nombre", "Introducir nombre completo"]]}
 
 GRAFICO → tipo "tabla" + "parrafo":
 [
-    {"tipo": "parrafo", "texto": "Descripción del gráfico: qué muestra, tendencia principal, conclusión"},
+    {"tipo": "parrafo", "texto": "Descripción: qué muestra, tendencia principal, conclusión"},
     {"tipo": "tabla", "filas": [["Categoría", "Valor"], ["dato1", "valor1"]]}
 ]
 
-DECORATIVA → bloques vacío:
+DECORATIVA → bloques vacío (SOLO si no hay texto educativo):
 {"clasificacion": "DECORATIVA", "confianza": 1.0, "descripcion_breve": "...", "bloques": []}
 
 REGLAS CRÍTICAS:
-1. FIDELIDAD: Transcribe TODO lo visible. No inventes datos.
-2. VERIFICAR: Si un dato no es 100% legible, añade " [VERIFICAR]" después.
-3. CONTEXTO: Usa el contexto del documento para entender la imagen.
-4. IDIOMA: Contenido de salida en el mismo idioma que el contexto.
-5. Si la imagen está en baja resolución y no puedes extraer info útil, clasifícala como DECORATIVA.
+1. FIDELIDAD TOTAL: Transcribe CADA palabra, número o etiqueta visible en la imagen. No pierdas nada.
+2. DUDA = NO DECORATIVA: Si dudas entre DECORATIVA y otra categoría, elige la otra. Solo es DECORATIVA si estás seguro de que no hay texto educativo.
+3. Si un texto no es 100% legible, escríbelo seguido de " [VERIFICAR]".
+4. IDIOMA: Salida en el mismo idioma que el contexto del documento.
+5. Resolución baja: si hay texto pero no es legible, clasifica igual pero indica [VERIFICAR] en los datos.
 PROMPT
 );
 

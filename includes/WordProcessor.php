@@ -127,24 +127,25 @@ class WordProcessor
                             $rId = $this->extractImageRId($drawing);
                             if ($rId && isset($this->relationships[$rId])) {
                                 $filename = basename($this->relationships[$rId]);
+                                $placeholder = '[IMAGEN: ' . $filename . ']';
+                                // SIEMPRE registrar posición e insertar placeholder,
+                                // independientemente de si el párrafo tiene texto o no.
+                                // Esto garantiza que imágenes inline (con caption en
+                                // el mismo párrafo) también se procesan correctamente.
                                 $this->imagePositions[] = [
                                     'rId' => $rId,
                                     'paragraph_index' => count($this->paragraphs),
                                     'preceding_text' => trim($text),
                                     'filename' => $filename
                                 ];
-                                // Si el párrafo solo contiene imagen (sin texto), insertar placeholder
-                                if (empty(trim($text))) {
-                                    $placeholder = '[IMAGEN: ' . $filename . ']';
-                                    $this->paragraphs[] = [
-                                        'text' => $placeholder,
-                                        'style' => 'ImagePlaceholder',
-                                        'is_heading' => false,
-                                        'is_list' => false,
-                                        'image_rId' => $rId
-                                    ];
-                                    $currentText[] = $placeholder;
-                                }
+                                $this->paragraphs[] = [
+                                    'text' => $placeholder,
+                                    'style' => 'ImagePlaceholder',
+                                    'is_heading' => false,
+                                    'is_list' => false,
+                                    'image_rId' => $rId
+                                ];
+                                $currentText[] = $placeholder;
                             }
                         }
                     }
@@ -162,7 +163,7 @@ class WordProcessor
                     // Extraer tabla como datos estructurados
                     $tableData = $this->parseTable($node);
                     $this->tables[] = $tableData;
-                    
+
                     // CRUCIAL: Convertir tabla a texto legible e incluirla
                     // en el flujo de párrafos para que la IA la vea y no se pierda
                     $tableText = $this->tableToText($tableData);
@@ -174,6 +175,31 @@ class WordProcessor
                             'is_list' => false
                         ];
                         $currentText[] = $tableText;
+                    }
+
+                    // Imágenes dentro de celdas de tabla: también deben procesarse.
+                    // Un autor puede pegar una imagen dentro de una celda Word.
+                    $tableDrawings = $node->getElementsByTagName('drawing');
+                    foreach ($tableDrawings as $drawing) {
+                        $rId = $this->extractImageRId($drawing);
+                        if ($rId && isset($this->relationships[$rId])) {
+                            $filename = basename($this->relationships[$rId]);
+                            $placeholder = '[IMAGEN: ' . $filename . ']';
+                            $this->imagePositions[] = [
+                                'rId' => $rId,
+                                'paragraph_index' => count($this->paragraphs),
+                                'preceding_text' => $tableText,
+                                'filename' => $filename
+                            ];
+                            $this->paragraphs[] = [
+                                'text' => $placeholder,
+                                'style' => 'ImagePlaceholder',
+                                'is_heading' => false,
+                                'is_list' => false,
+                                'image_rId' => $rId
+                            ];
+                            $currentText[] = $placeholder;
+                        }
                     }
                 }
             }
@@ -820,14 +846,17 @@ class WordProcessor
     /**
      * Extrae el rId de un nodo <drawing>.
      * Tras strip de namespaces: drawing > inline/anchor > graphic > graphicData > pic > blipFill > blip[@embed]
+     *
+     * Dos rutas posibles según cómo quede el XML tras el strip de namespaces:
+     *   - <blip embed="rIdX"/>              → getElementsByTagName('blip') directo
+     *   - <blipFill><blip embed="rIdX"/>    → hay que bajar a blipFill primero
      */
     private function extractImageRId($drawingNode): ?string
     {
+        // Ruta 1: <blip> directo (cuando el strip deja <blip embed="rIdX"/>)
         $blips = $drawingNode->getElementsByTagName('blip');
         if ($blips->length > 0) {
             $blip = $blips->item(0);
-            // El atributo puede ser "embed" o "r:embed" (el namespace stripping
-            // solo afecta a tags, no a atributos con prefijo)
             $embed = $blip->getAttribute('embed');
             if (empty($embed)) {
                 $embed = $blip->getAttribute('r:embed');
@@ -836,6 +865,25 @@ class WordProcessor
                 return $embed;
             }
         }
+
+        // Ruta 2: <blip> dentro de <blipFill>
+        // Ocurre cuando <a:blipFill> queda como <blipFill> tras el strip de tags
+        // y getElementsByTagName('blip') no lo encuentra porque el contexto DOM difiere
+        $blipFills = $drawingNode->getElementsByTagName('blipFill');
+        if ($blipFills->length > 0) {
+            $innerBlips = $blipFills->item(0)->getElementsByTagName('blip');
+            if ($innerBlips->length > 0) {
+                $blip = $innerBlips->item(0);
+                $embed = $blip->getAttribute('embed');
+                if (empty($embed)) {
+                    $embed = $blip->getAttribute('r:embed');
+                }
+                if (!empty($embed)) {
+                    return $embed;
+                }
+            }
+        }
+
         return null;
     }
 
